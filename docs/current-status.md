@@ -2,46 +2,50 @@
 
 **Last updated:** 2026-07-14  
 **Default branch:** `main`  
-**Active proposal branch:** `agent/stage-0-architecture-baseline`
+**Active proposal branch:** `agent/record-stage-0-decisions`
 
 ## Current state
 
-The repository is initialized with:
+Stage 0 architecture decisions D-EA-001 through D-EA-005 were approved after independent review and are recorded as ADR-001 through ADR-005.
 
-- a frozen historical engineering extraction baseline;
-- a draft domain-agnostic Extraction Contract v0.1;
-- a draft Conversation Profile v0.1;
-- observational Stage 1–7 output fixtures;
-- a pre-decision architecture scaffold.
+Accepted baseline:
 
-No runtime architecture, candidate JSON schema, provider, or production deployment has been approved.
+- JSON is the candidate system of record;
+- Markdown is a deterministic review projection;
+- runs use immutable per-run directories;
+- the first vertical slice uses a draft Engineering Profile and one historical Stage;
+- one provider is implemented behind a small provider-neutral interface;
+- structural pass/fail is separate from evaluation findings;
+- extraction does not assign governance or consolidation states.
 
-## Active work
+The historical engineering baseline remains frozen evidence. The Extraction Contract v0.1 and Conversation Profile v0.1 remain drafts.
 
-Stage 0 proposes governance and the minimum architecture/authority decisions required before implementation.
+## Review follow-ups
 
-Decision packet: `docs/stage-0-architecture-review.md`
+Both non-blocking Stage 0 observations are addressed:
 
-Pending decisions:
+1. `docs/architecture.md` is synchronized with the accepted ADRs.
+2. Historical Stage selection now requires a recorded sensitive-data check before use.
 
-- D-EA-001 — system-of-record output;
-- D-EA-002 — immutable run layout;
-- D-EA-003 — first vertical slice;
-- D-EA-004 — provider boundary;
-- D-EA-005 — evaluation status semantics.
+## Next scoped milestone
+
+Prepare the first vertical-slice specifications:
+
+1. derive `profiles/drafts/engineering-profile-v0.1.md`;
+2. select one representative Stage fixture after the sensitive-data check;
+3. define the candidate JSON schema;
+4. define the run manifest and immutable artifact contract;
+5. define structural and evaluation finding contracts.
+
+This milestone is specification-only until those artifacts are reviewed.
 
 ## Hard holds
 
-Do not begin runtime implementation until the pending Stage 0 decisions are dispositioned.
+Do not yet:
 
-Do not:
-
-- treat historical fixtures as canonical or exact golden outputs;
-- freeze the draft contract or conversation profile without required real runs;
-- assign maturity or canonical identity during extraction;
-- add a permanent knowledge-base write path;
-- select a multi-provider framework without evidence that one provider adapter is insufficient.
-
-## Recommended next action
-
-Review the Stage 0 decision packet, obtain independent architecture review, then record owner dispositions. After approval, derive the Engineering Profile and define the candidate/run contracts.
+- implement a provider adapter or runtime CLI;
+- freeze the draft contract or either profile;
+- treat historical outputs as exact golden results;
+- add consolidation, identity, maturity, promotion, or KB-write behavior;
+- build multi-provider orchestration;
+- use a historical Stage source without the recorded sensitive-data check.
