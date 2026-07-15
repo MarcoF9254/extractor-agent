@@ -1,6 +1,6 @@
 # Stage 0 Architecture and Authority Review
 
-**Status:** Draft decision packet  
+**Status:** Approved decision record  
 **Reference repository:** `MarcoF9254/monthly-agent`  
 **Scope:** Documentation and owner-gated architecture only; no runtime implementation
 
@@ -71,7 +71,7 @@ Not shown because they are explicitly downstream: consolidation, identity resolu
 
 ### D-EA-001 — System-of-record output
 
-**DECISION PENDING — Requires Owner Approval**
+**APPROVED — 2026-07-14**
 
 Options:
 
@@ -85,7 +85,7 @@ Options:
 
 ### D-EA-002 — Run artifact layout
 
-**DECISION PENDING — Requires Owner Approval**
+**APPROVED — 2026-07-14**
 
 Options:
 
@@ -118,7 +118,7 @@ data/runs/<run_id>/
 
 ### D-EA-003 — First vertical slice
 
-**DECISION PENDING — Requires Owner Approval**
+**APPROVED — 2026-07-14**
 
 Options:
 
@@ -132,7 +132,7 @@ Options:
 
 ### D-EA-004 — Model/provider boundary
 
-**DECISION PENDING — Requires Owner Approval**
+**APPROVED — 2026-07-14**
 
 Options:
 
@@ -146,7 +146,7 @@ The first implementation should support one real provider but persist provider/m
 
 ### D-EA-005 — Evaluation status semantics
 
-**DECISION PENDING — Requires Owner Approval**
+**APPROVED — 2026-07-14**
 
 Options:
 
@@ -160,10 +160,10 @@ Extraction can fail structurally or carry grounding/quality findings. It must no
 
 ## 6. Proposed first delivery sequence
 
-1. Owner reviews D-EA-001 through D-EA-005.
+1. D-EA-001 through D-EA-005 were approved on 2026-07-14.
 2. Derive `profiles/drafts/engineering-profile-v0.1.md` from the draft contract and frozen historical baseline.
 3. Define the candidate JSON schema and run manifest contract.
-4. Select one Stage fixture and record expected evaluation questions, not a forced golden output.
+4. Select one Stage fixture only after recording a sensitive-data check; record expected evaluation questions, not a forced golden output.
 5. Implement a local CLI vertical slice with one provider.
 6. Compare its artifact with the historical output and record defects.
 7. Review contract/profile friction before freezing either document.
@@ -177,11 +177,16 @@ Extraction can fail structurally or carry grounding/quality findings. It must no
 - **Authority collapse:** calling candidates approved knowledge would merge extraction and governance.
 - **Sensitive-source exposure:** future private conversations require explicit retention, redaction, and access controls before production use.
 
-## 8. Completion criteria for Stage 0
+## 8. Stage 0 disposition
 
-Stage 0 completes only when:
+Stage 0 was approved on 2026-07-14 after independent review.
 
-- D-EA-001 through D-EA-005 have explicit owner dispositions;
-- governance and ADR document responsibilities are accepted;
-- the first vertical slice and its evidence source are selected;
-- no pending decision is accidentally recorded as accepted architecture.
+- D-EA-001 through D-EA-005 were accepted as recommended.
+- Governance and ADR document responsibilities were accepted.
+- The first vertical-slice strategy was selected; the exact Stage fixture remains a scoped implementation-planning choice subject to the sensitive-data gate.
+- Accepted decisions are recorded in `docs/decisions.md` and reflected in `docs/architecture.md`.
+
+Independent review raised two non-blocking follow-ups, both addressed in the decision-recording change:
+
+1. synchronize `docs/architecture.md` with accepted decisions;
+2. bind a sensitive-data check to historical Stage fixture selection.
