@@ -108,10 +108,8 @@
         }
       },
       "then": {
-        "not": {
-          "required": [
-            "reason"
-          ]
+        "properties": {
+          "reason": false
         }
       }
     }
