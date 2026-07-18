@@ -96,6 +96,10 @@
           "findings": {
             "maxItems": 0,
             "type": "array"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
