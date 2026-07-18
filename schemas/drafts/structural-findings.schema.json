@@ -94,12 +94,8 @@
         "properties": {
           "findings": {
             "maxItems": 0
-          }
-        },
-        "not": {
-          "required": [
-            "error"
-          ]
+          },
+          "error": false
         }
       }
     },
@@ -115,12 +111,8 @@
         "properties": {
           "findings": {
             "minItems": 1
-          }
-        },
-        "not": {
-          "required": [
-            "error"
-          ]
+          },
+          "error": false
         }
       }
     },
