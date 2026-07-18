@@ -94,7 +94,8 @@
         ],
         "properties": {
           "findings": {
-            "maxItems": 0
+            "maxItems": 0,
+            "type": "array"
           }
         }
       }
