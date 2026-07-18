@@ -134,6 +134,7 @@
           "if": {
             "properties": {
               "sensitive_data_check": {
+                "type": "object",
                 "properties": {
                   "outcome": {
                     "const": "cleared"
@@ -145,6 +146,7 @@
           "then": {
             "properties": {
               "selected": {
+                "type": "object",
                 "properties": {
                   "relation": {
                     "const": "original"
@@ -158,6 +160,7 @@
           "if": {
             "properties": {
               "sensitive_data_check": {
+                "type": "object",
                 "properties": {
                   "outcome": {
                     "const": "redacted_derivative"
@@ -169,6 +172,7 @@
           "then": {
             "properties": {
               "selected": {
+                "type": "object",
                 "properties": {
                   "relation": {
                     "const": "redacted_derivative"
