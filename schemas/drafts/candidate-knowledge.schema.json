@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MarcoF9254/extractor-agent/schemas/drafts/candidate-knowledge.schema.json",
+  "title": "Candidate Knowledge Artifact v0.1",
+  "description": "Draft evaluation-only system-of-record output for one source-bounded Engineering Profile extraction.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_version",
+    "run_id",
+    "source_id",
+    "profile",
+    "items"
+  ],
+  "properties": {
+    "artifact_version": {
+      "const": "candidate-knowledge-v0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "const": "engineering-profile"
+        },
+        "version": {
+          "const": "0.1"
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "title",
+          "knowledge_type",
+          "normalized_statement",
+          "reasoning",
+          "tradeoffs_limitations",
+          "candidate_concepts",
+          "metadata"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^CAND-[0-9]{3,}$",
+            "description": "Run-local handle only; never a canonical or permanent knowledge ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "knowledge_type": {
+            "enum": [
+              "Engineering Principle",
+              "Architecture Pattern",
+              "Development Workflow",
+              "Testing Strategy",
+              "Repository & Git Practice",
+              "AI Collaboration Pattern",
+              "Decision Framework",
+              "Pitfall",
+              "Rejected Alternative"
+            ]
+          },
+          "normalized_statement": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source-local stylistic normalization, not canonicalization."
+          },
+          "reasoning": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tradeoffs_limitations": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_concepts": {
+            "type": "array",
+            "maxItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_reference",
+              "evidence_pointer",
+              "reinforcement_count",
+              "confidence"
+            ],
+            "properties": {
+              "source_reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_pointer": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reinforcement_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "confidence": {
+                "enum": [
+                  "High",
+                  "Medium",
+                  "Low"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
