@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MarcoF9254/extractor-agent/schemas/drafts/evaluation-findings.schema.json",
+  "title": "Evaluation Findings v0.1",
+  "description": "Draft grounding and quality review evidence; never a knowledge approval artifact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "run_id",
+    "status",
+    "findings"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "evaluation-findings-v0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "not_performed"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "finding_id",
+          "category",
+          "level",
+          "message"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "pattern": "^EF-[0-9]{3,}$"
+          },
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^CAND-[0-9]{3,}$",
+            "description": "Optional run-local candidate reference."
+          },
+          "category": {
+            "enum": [
+              "grounding",
+              "exclusion",
+              "reusability",
+              "specificity",
+              "evidence_quality",
+              "confidence_calibration",
+              "profile_type_fit"
+            ]
+          },
+          "level": {
+            "enum": [
+              "observation",
+              "concern"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_pointer": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "not_performed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "findings": {
+            "maxItems": 0,
+            "type": "array"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "reason": false
+        }
+      }
+    }
+  ]
+}
