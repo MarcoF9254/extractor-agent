@@ -72,41 +72,30 @@
           }
         },
         "selected": {
-          "allOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "path",
-                "sha256"
-              ],
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
-                  "description": "Path relative to the run directory."
-                },
-                "sha256": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                }
-              }
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "relation"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
+              "description": "Path relative to the run directory."
             },
-            {
-              "type": "object",
-              "properties": {
-                "relation": {
-                  "enum": [
-                    "original",
-                    "redacted_derivative"
-                  ]
-                }
-              },
-              "required": [
-                "relation"
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "relation": {
+              "enum": [
+                "original",
+                "redacted_derivative"
               ]
             }
-          ]
+          }
         },
         "sensitive_data_check": {
           "type": "object",
@@ -200,93 +189,71 @@
       ],
       "properties": {
         "contract": {
-          "allOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "path",
-                "sha256"
-              ],
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
-                  "description": "Path relative to the run directory."
-                },
-                "sha256": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                }
-              }
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "version",
+            "status"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
+              "description": "Path relative to the run directory."
             },
-            {
-              "type": "object",
-              "properties": {
-                "version": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "status": {
-                  "enum": [
-                    "draft",
-                    "frozen"
-                  ]
-                }
-              },
-              "required": [
-                "version",
-                "status"
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "enum": [
+                "draft",
+                "frozen"
               ]
             }
-          ]
+          }
         },
         "profile": {
-          "allOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "path",
-                "sha256"
-              ],
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
-                  "description": "Path relative to the run directory."
-                },
-                "sha256": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                }
-              }
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "name",
+            "version",
+            "status"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
+              "description": "Path relative to the run directory."
             },
-            {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "version": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "status": {
-                  "enum": [
-                    "draft",
-                    "frozen"
-                  ]
-                }
-              },
-              "required": [
-                "name",
-                "version",
-                "status"
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "enum": [
+                "draft",
+                "frozen"
               ]
             }
-          ]
+          }
         }
       }
     },
@@ -447,38 +414,27 @@
           }
         },
         "candidate_markdown": {
-          "allOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "path",
-                "sha256"
-              ],
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
-                  "description": "Path relative to the run directory."
-                },
-                "sha256": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                }
-              }
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "derived_from"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
+              "description": "Path relative to the run directory."
             },
-            {
-              "type": "object",
-              "properties": {
-                "derived_from": {
-                  "const": "candidate/items.json"
-                }
-              },
-              "required": [
-                "derived_from"
-              ]
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "derived_from": {
+              "const": "candidate/items.json"
             }
-          ]
+          }
         },
         "structural_findings": {
           "type": "object",
@@ -519,39 +475,28 @@
           }
         },
         "provider_metadata": {
-          "allOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "path",
-                "sha256"
-              ],
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
-                  "description": "Path relative to the run directory."
-                },
-                "sha256": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                }
-              }
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "namespace"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+$",
+              "description": "Path relative to the run directory."
             },
-            {
-              "type": "object",
-              "properties": {
-                "namespace": {
-                  "type": "string",
-                  "pattern": "^[a-z0-9][a-z0-9._-]*$"
-                }
-              },
-              "required": [
-                "namespace"
-              ]
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "namespace": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]*$"
             }
-          ]
+          }
         }
       }
     }
