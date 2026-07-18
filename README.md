@@ -4,26 +4,37 @@ A governance-first agent for extracting reusable knowledge from conversations, p
 
 ## Repository status
 
-This repository is initialized for specification and architecture work. No runtime architecture or model provider has been approved yet.
+Stage 0 architecture is approved. The first vertical-slice contract pack is under draft review. No provider implementation, runtime CLI, production run, or permanent knowledge-base write path is authorized.
 
 | Area | Authority status |
 |---|---|
-| `specs/baselines/` | Historical frozen baseline used for the Stage 1–7 test runs |
-| `specs/drafts/` | Proposed contracts; not frozen or authoritative |
-| `profiles/drafts/` | Proposed domain profiles; not frozen or authoritative |
-| `tests/fixtures/stage-outputs/` | Observed extraction outputs retained as test evidence, not canonical knowledge |
-| `src/` | Reserved for implementation after architecture approval |
-| `docs/` | Architecture, decisions, and source-status records |
+| `docs/architecture.md` | Accepted Stage 0 system and authority boundary |
+| `docs/decisions.md` | Accepted ADR-001 through ADR-005 |
+| `specs/baselines/` | Immutable historical baseline used for Stage 1–7 observational runs |
+| `specs/drafts/` | Proposed contracts; not frozen or runtime authority |
+| `profiles/drafts/` | Proposed domain profiles; not frozen or runtime authority |
+| `schemas/drafts/` | Proposed evaluation schemas; structural validity would not confer knowledge authority |
+| `tests/fixtures/stage-outputs/` | Historical outputs retained as observational comparison evidence, not golden truth |
+| `src/` | Implementation held until the contract pack is reviewed and authorized |
 
 ## Boundary
 
-Extraction operates on one bounded source and produces grounded candidate knowledge. Cross-source consolidation, maturity assessment, canonical identity, promotion, and publication authority are downstream concerns and must not be silently performed during extraction.
+Extraction operates on one bounded source and produces grounded candidate knowledge.
 
-## Immediate next stage
+Cross-source consolidation, maturity assessment, canonical identity, approval, promotion, conflict resolution, deprecation, publication, and permanent knowledge-base mutation are downstream concerns and must not be performed during extraction.
 
-1. Freeze the extraction contract and at least one profile.
-2. Define an output schema and machine-checkable invariants.
-3. Turn the Stage 1–7 outputs into an explicit evaluation corpus.
-4. Select the smallest vertical slice before choosing production infrastructure.
+JSON is the candidate system of record. Markdown is a deterministic review projection and cannot become an independently edited source of truth.
 
-See [docs/source-material-status.md](docs/source-material-status.md) and [docs/architecture.md](docs/architecture.md).
+## Current milestone
+
+The specification-only vertical-slice pack defines:
+
+1. a draft Engineering Profile;
+2. a draft candidate knowledge schema;
+3. a draft immutable run manifest and sensitive-source record;
+4. separate structural and evaluation finding schemas;
+5. the evaluation-only artifact boundary.
+
+The historical `stage-01.md` through `stage-07.md` files are extraction outputs, not the original bounded Stage sources. A real vertical-slice run requires a separately supplied Stage transcript that passes the sensitive-data selection gate.
+
+See [docs/architecture.md](docs/architecture.md), [docs/current-status.md](docs/current-status.md), and [specs/drafts/artifact-contracts-v0.1.md](specs/drafts/artifact-contracts-v0.1.md).
