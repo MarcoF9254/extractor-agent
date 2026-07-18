@@ -93,7 +93,8 @@
       "then": {
         "properties": {
           "findings": {
-            "maxItems": 0
+            "maxItems": 0,
+            "type": "array"
           },
           "error": false
         }
@@ -110,7 +111,8 @@
       "then": {
         "properties": {
           "findings": {
-            "minItems": 1
+            "minItems": 1,
+            "type": "array"
           },
           "error": false
         }
@@ -130,7 +132,8 @@
         ],
         "properties": {
           "findings": {
-            "maxItems": 0
+            "maxItems": 0,
+            "type": "array"
           }
         }
       }
