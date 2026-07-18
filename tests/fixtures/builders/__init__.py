@@ -29,8 +29,9 @@ def build_zip(
         # -- Manifest -----------------------------------------------------------
         if manifest is None:
             manifest = {
-                "export_manifest_version": 1,
-                "conversation_shards": ["conversations-000.json"],
+                "version": 1,
+                "export_files": ["conversations-000.json"],
+                "logical_files": {},
             }
         zf.writestr("export_manifest.json", json.dumps(manifest, sort_keys=True, indent=2))
 

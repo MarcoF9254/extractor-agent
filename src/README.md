@@ -35,7 +35,7 @@ timestamps, no absolute paths):
 | Field | Type | Description |
 |---|---|---|
 | `inventory_schema_version` | `str` | `"0.1"` |
-| `export_manifest_version` | `int` | From the ZIP manifest |
+| `export_manifest_version` | `int` | From ZIP manifest ``"version"`` field (provisional output name) |
 | `conversation_shards` | `list[str]` | Sorted shard filenames |
 | `conversation_count` | `int` | Total conversations |
 | `conversation_node_count` | `int` | Total mapping nodes |
@@ -76,7 +76,7 @@ documented in `constants.py` as Pilot A implementation limits.
 
 ```bash
 cd /c/AI-Projects/extractor-agent
-uv pip install -e ".[dev]"
+uv pip install pytest  # or: uv sync --group dev
 pytest tests/test_inventory.py -v
 ```
 

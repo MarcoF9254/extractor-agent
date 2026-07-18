@@ -125,18 +125,23 @@ def _build_inventory_inner(
     # -- Read & validate export manifest -------------------------------------
     if MANIFEST_NAME not in name_index:
         raise ManifestError(f"{MANIFEST_NAME} is missing from archive")
-    if MANIFEST_NAME not in name_index:
-        raise ManifestError(f"{MANIFEST_NAME} is missing from archive")
 
     manifest_raw = _read_json_member(zf, name_index[MANIFEST_NAME], limits)
     if not isinstance(manifest_raw, dict):
         raise ManifestError(f"{MANIFEST_NAME} root is not a JSON object")
 
-    export_manifest_version = manifest_raw.get("export_manifest_version")
-    if not isinstance(export_manifest_version, int):
+    # Read the real "version" field from the ChatGPT export manifest.
+    # Reject the invented legacy field "export_manifest_version" when
+    # "version" is absent (fail-closed — do not treat an invented
+    # fixture-only schema as canonical).
+    version = manifest_raw.get("version")
+    if not isinstance(version, int):
         raise ManifestError(
-            "export_manifest_version is missing or not an integer"
+            'Manifest field "version" is missing or not an integer'
         )
+
+    # The output preserves the provisional field name.
+    export_manifest_version = version
 
     # -- Discover conversation shards ---------------------------------------
     shards = _discover_shards(manifest_raw, name_index)

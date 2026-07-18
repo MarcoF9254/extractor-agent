@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Governed extraction agent for bounded source knowledge extraction"
 requires-python = ">=3.10"
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = ["pytest"]
 
 [tool.pytest.ini_options]
