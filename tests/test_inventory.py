@@ -849,23 +849,46 @@ class TestDuplicateMemberName:
 
 
 class TestEncryptedMember:
+    def test_end_to_end_encrypted_rejected(self):
+        """End-to-end: encrypted ZIP rejected with SecurityError."""
+        import subprocess, sys
+
+        data = _build_encrypted_zip()
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, data)
+        os.close(fd)
+        try:
+            # API path
+            with pytest.raises(SecurityError, match="Encrypted"):
+                build_inventory(path)
+
+            # CLI path
+            cp = subprocess.run(
+                [sys.executable, "-m", "extractor_agent.inventory", path],
+                capture_output=True,
+                cwd=os.path.join(os.path.dirname(__file__), ".."),
+            )
+            assert cp.returncode != 0
+            assert cp.stdout == b""
+            assert b"Error: SecurityError" in cp.stderr
+            assert b"export_manifest.json" not in cp.stderr
+            assert b"\\x5c" not in cp.stderr  # no member path
+        finally:
+            os.unlink(path)
+
     def test_encrypted_member_rejected(self):
-        """A ZIP member with the encryption flag bit must be rejected.
+        """Unit-level check: _check_encrypted rejects a ZipInfo with
+        the encryption flag set (exercises the check in isolation)."""
+        from extractor_agent.inventory import _check_encrypted
+        from zipfile import ZipInfo, ZIP_DEFLATED
 
-        We test by constructing a ``ZipInfo`` with the encryption flag
-        (bit 0) set, then calling ``_check_member`` directly.
-        """
-        from extractor_agent.inventory import _check_member
-
-        info = ZipInfo("test_encrypted.json")
-        info.flag_bits = 0x01  # encryption flag
+        info = ZipInfo("secret.dat")
+        info.flag_bits = 0x01
         info.compress_type = ZIP_DEFLATED
         info.file_size = 100
         info.compress_size = 50
-
-        seen: Dict[str, ZipInfo] = {}
         with pytest.raises(SecurityError, match="Encrypted"):
-            _check_member(info, DEFAULT_LIMITS, seen)
+            _check_encrypted(info)
 
 
 # ======================================================================
@@ -1015,7 +1038,7 @@ class TestResourceLimits:
 
     def test_exceeds_max_json_uncompressed(self):
         """A JSON member larger than the limit is rejected."""
-        small_limits = {**DEFAULT_LIMITS, "max_json_uncompressed_bytes": 100}
+        small_limits = {**DEFAULT_LIMITS, "max_member_uncompressed_bytes": 100}
         # Build a conversation with enough data to exceed 100 bytes uncompressed.
         conv = make_conversation(
             conv_id_seed=170,
@@ -1037,8 +1060,192 @@ class TestResourceLimits:
 
 
 # ======================================================================
-# Asset file counting
+# Symlink and special-entry rejection
 # ======================================================================
+
+
+class TestSpecialEntryRejection:
+    def test_symlink_rejected_by_mode(self):
+        """A ZipInfo with Unix symlink mode bits raises SecurityError."""
+        from zipfile import ZipInfo, ZIP_DEFLATED
+        from extractor_agent.inventory import _check_special_entry
+
+        info = ZipInfo("symlink.txt")
+        info.compress_type = ZIP_DEFLATED
+        info.file_size = 10
+        info.compress_size = 10
+        # Set Unix symlink mode (0o120777)
+        info.external_attr = (0o120777 << 16)
+        with pytest.raises(SecurityError, match="special-file"):
+            _check_special_entry(info)
+
+    def test_device_rejected_by_mode(self):
+        """A ZipInfo with block device mode raises SecurityError."""
+        from zipfile import ZipInfo, ZIP_DEFLATED
+        from extractor_agent.inventory import _check_special_entry
+
+        info = ZipInfo("device")
+        info.compress_type = ZIP_DEFLATED
+        info.file_size = 0
+        info.compress_size = 0
+        info.external_attr = (0o060000 << 16)  # S_IFBLK
+        with pytest.raises(SecurityError, match="special-file"):
+            _check_special_entry(info)
+
+    def test_ordinary_file_without_mode_not_rejected(self):
+        """A ZipInfo with external_attr=0 is not treated as special."""
+        from zipfile import ZipInfo, ZIP_DEFLATED
+        from extractor_agent.inventory import _check_special_entry
+
+        info = ZipInfo("normal.txt")
+        info.compress_type = ZIP_DEFLATED
+        info.file_size = 100
+        info.compress_size = 50
+        info.external_attr = 0  # Windows-origin archive
+        # Should not raise
+        _check_special_entry(info)
+
+
+# ======================================================================
+# Duplicate member name end-to-end
+# ======================================================================
+
+
+class TestDuplicateMember:
+    def test_duplicate_member_rejected_end_to_end(self):
+        """A ZIP with duplicate member names is rejected.
+
+        The fixture creates a single-member ZIP, then appends the same
+        ZipInfo to the internal filelist so the central directory will
+        contain two entries with the same name.
+        """
+        import io
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 100}],
+            }))
+            zf.writestr("conversations-000.json", json.dumps([
+                make_conversation(999, [(0, make_message(role="user", content_type="text"))])
+            ]))
+            # Append a duplicate entry to internal filelist
+            zf.filelist.append(zf.filelist[-1])
+
+        data = buf.getvalue()
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, data)
+        os.close(fd)
+        try:
+            with pytest.raises(SecurityError, match="Duplicate"):
+                build_inventory(path)
+        finally:
+            os.unlink(path)
+
+
+# ======================================================================
+# No-decompression-before-admission-before-admission instrumentation
+# ======================================================================
+
+
+
+
+def _build_encrypted_zip() -> bytes:
+    """Build a ZIP whose manifest entry has the encryption flag set
+    in the central directory, causing ZipFile.infolist() to report
+    flag_bits & 0x01 for that entry."""
+    import struct, io
+    from zipfile import ZipFile, ZIP_DEFLATED
+
+    buf = io.BytesIO()
+    manifest = {"version": 1,
+                 "logical_files": {"conversations.json": {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                 "export_files": [{"path": "conversations-000.json", "size_bytes": 100}]}
+    with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+        zf.writestr("export_manifest.json", json.dumps(manifest))
+        zf.writestr("conversations-000.json", json.dumps([]))
+
+    raw = bytearray(buf.getvalue())
+    target = b"export_manifest.json"
+
+    # Find and patch every CD entry (PK) whose filename matches
+    pos = 0
+    while True:
+        cd_start = raw.find(b"PK", pos)
+        if cd_start < 0:
+            break
+        # CD structure: sig(4) + ver_made(2) + ver_needed(2) + flags(2) = offset 10
+        # Filename length at offset 28 (sig(4)+ver_made(2)+ver_needed(2)+flags(2)+
+        #   method(2)+time(2)+date(2)+crc32(4)+csize(4)+usize(4)+fname_len(2) = 28)
+        fname_len = struct.unpack_from("<H", raw, cd_start + 28)[0]
+        # Extra field length at offset 30
+        extra_len = struct.unpack_from("<H", raw, cd_start + 30)[0]
+        # Filename at offset 46
+        fname_start = cd_start + 46
+        fname = raw[fname_start:fname_start + fname_len]
+        if fname == target:
+            # Set bit 0 (encryption) in flag_bits at offset +10
+            struct.pack_into("<H", raw, cd_start + 8, 0x01)
+        # Skip to next: cd_entry_size = 46 + fname_len + extra_len + comment_len
+        comment_len = struct.unpack_from("<H", raw, cd_start + 32)[0]
+        pos = cd_start + 46 + fname_len + extra_len + comment_len
+
+    return bytes(raw)
+
+
+class TestNoDecompressionBeforeAdmission:
+    def test_stored_huge_member_limit_enforced_before_read(self):
+        """A stored (ratio 1.0) member exceeding per-member limit is
+        rejected by metadata alone, before any read/decompress."""
+        small_limits = {**DEFAULT_LIMITS, "max_member_uncompressed_bytes": 100}
+        # Build a ZIP where the manifest is small but a shard is oversized.
+        import io
+        from zipfile import ZipFile, ZIP_STORED
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_STORED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json": {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 1000}],
+            }))
+            # A stored member with large file_size
+            data = b" " * 5000
+            zf.writestr("conversations-000.json", data)
+
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, buf.getvalue())
+        os.close(fd)
+        try:
+            with pytest.raises(LimitExceededError, match="Uncompressed size"):
+                build_inventory(path, limits=small_limits)
+        finally:
+            os.unlink(path)
+
+    def test_encrypted_zip_not_decompressed(self):
+        """An encrypted member is rejected in Phase 2 before testzip."""
+        data = _build_encrypted_zip()
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, data)
+        os.close(fd)
+        try:
+            with pytest.raises(SecurityError, match="Encrypted"):
+                build_inventory(path)
+        finally:
+            os.unlink(path)
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, data)
+        os.close(fd)
+        try:
+            with pytest.raises(SecurityError, match="Encrypted"):
+                build_inventory(path)
+        finally:
+            os.unlink(path)
+
 
 
 class TestAssetFiles:

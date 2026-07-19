@@ -10,11 +10,11 @@ from typing import Dict, Any
 DEFAULT_LIMITS: Dict[str, Any] = {
     # Maximum number of entries in the ZIP archive.
     "max_archive_entries": 2_000,
-    # Maximum uncompressed size of a single JSON member (bytes).
+    # Maximum uncompressed size of a single member (bytes).
     # 500 MB allows large conversation exports without unbounded memory.
-    "max_json_uncompressed_bytes": 500 * 1024 * 1024,
-    # Maximum total uncompressed JSON size across all relevant members (bytes).
-    "max_total_json_uncompressed_bytes": 2 * 1024 * 1024 * 1024,
+    "max_member_uncompressed_bytes": 500 * 1024 * 1024,
+    # Maximum total uncompressed bytes across the entire archive.
+    "max_total_uncompressed_bytes": 3 * 1024 * 1024 * 1024,
     # Maximum conversation count across all shards.
     "max_conversation_count": 10_000,
     # Maximum mapping-node count across all conversations.

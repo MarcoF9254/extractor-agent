@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import stat
 from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional
 from zipfile import ZipFile, ZipInfo
@@ -88,7 +89,7 @@ def _build_inventory_inner(
     zf: ZipFile,
     limits: Dict[str, Any],
 ) -> Dict[str, Any]:
-    # -- Collect & validate members -----------------------------------------
+    # -- Phase 1: Archive entry count ---------------------------------------
     infos = zf.infolist()
 
     if len(infos) > limits["max_archive_entries"]:
@@ -97,31 +98,54 @@ def _build_inventory_inner(
             f"limit {limits['max_archive_entries']}"
         )
 
-    # Validate ZIP integrity (detect CRC / truncated-member errors).
+    # -- Phase 2: Metadata-only admission (no reading / decompression) ------
+    seen_names: Dict[str, ZipInfo] = {}
+    total_uncompressed = 0
+    total_json_uncompressed = 0
+    limit_member = limits["max_member_uncompressed_bytes"]
+    limit_total = limits["max_total_uncompressed_bytes"]
+
+    for info in infos:
+        _check_member_name(info.filename, seen_names)
+        _check_encrypted(info)
+        _check_compression(info)
+        _check_special_entry(info)
+        _check_ratio(info, limits)
+
+        norm = _norm_name(info.filename)
+
+        # Individual member uncompressed size limit (metadata check).
+        if info.file_size > limit_member:
+            raise LimitExceededError(
+                f"Uncompressed size {info.file_size} of {norm} "
+                f"exceeds limit {limit_member}"
+            )
+
+        total_uncompressed += info.file_size
+        if norm.endswith(".json"):
+            total_json_uncompressed += info.file_size
+
+        seen_names[norm] = info
+
+    # Total archive uncompressed size limit.
+    if total_uncompressed > limit_total:
+        raise LimitExceededError(
+            f"Total uncompressed size {total_uncompressed} "
+            f"exceeds limit {limit_total}"
+        )
+
+    # -- Phase 3: Integrity validation (after all metadata checks) ----------
+    # testzip() performs CRC / truncated-member verification by reading and
+    # decompressing — it is safe to call now because every member has been
+    # admitted on metadata alone.
     bad = zf.testzip()
     if bad is not None:
         raise ZipIntegrityError(f"ZIP integrity check failed on member: {bad}")
 
-    # Build a checked name -> ZipInfo index.
-    name_index: Dict[str, ZipInfo] = {}
-    total_uncompressed_json = 0
+    # -- Phase 4: Build name_index (safe to read now) -----------------------
+    name_index = dict(seen_names)
 
-    for info in infos:
-        _check_member(info, limits, name_index)
-
-        norm = _norm_name(info.filename)
-        name_index[norm] = info
-
-        if norm.endswith(".json"):
-            total_uncompressed_json += info.file_size
-
-    if total_uncompressed_json > limits["max_total_json_uncompressed_bytes"]:
-        raise LimitExceededError(
-            f"Total JSON uncompressed size {total_uncompressed_json} exceeds "
-            f"limit {limits['max_total_json_uncompressed_bytes']}"
-        )
-
-    # -- Read & validate export manifest -------------------------------------
+    # -- Phase 5: Read & validate export manifest --------------------------
     if MANIFEST_NAME not in name_index:
         raise ManifestError(f"{MANIFEST_NAME} is missing from archive")
 
@@ -324,49 +348,77 @@ def _norm_name(name: str) -> str:
     return name.replace("\\", "/")
 
 
-def _check_member(
-    info: ZipInfo,
-    limits: Dict[str, Any],
+def _check_member_name(
+    name: str,
     seen: Dict[str, ZipInfo],
 ) -> None:
-    """Run all per-member security checks."""
-    norm = _norm_name(info.filename)
+    """Check path traversal, absolute paths, and duplicate names.
 
-    # -- Path traversal ----------------------------------------------------
-    if info.filename.startswith("/") or info.filename.startswith("\\"):
-        raise SecurityError(f"Absolute-path ZIP member: {info.filename}")
-    if info.filename.startswith("../") or "/../" in norm or "\\..\\" in norm:
-        raise SecurityError(f"Path-traversal ZIP member: {info.filename}")
+    Operates on metadata only — does not read any member data.
+    """
+    if name.startswith("/") or name.startswith("\\"):
+        raise SecurityError(f"Absolute-path ZIP member: {name}")
+
+    norm = _norm_name(name)
+
+    if name.startswith("../") or "/../" in norm or "\\..\\" in norm:
+        raise SecurityError(f"Path-traversal ZIP member: {name}")
     try:
         parts = PurePosixPath(norm).parts
         if ".." in parts:
-            raise SecurityError(f"Path-traversal ZIP member: {info.filename}")
+            raise SecurityError(f"Path-traversal ZIP member: {name}")
     except (ValueError, TypeError):
-        raise SecurityError(f"Unusable ZIP member name: {info.filename}")
+        raise SecurityError(f"Unusable ZIP member name: {name}")
 
-    # -- Duplicate names ---------------------------------------------------
     if norm in seen:
-        raise SecurityError(f"Duplicate ZIP member name: {info.filename}")
+        raise SecurityError(f"Duplicate ZIP member name: {name}")
 
-    # -- Encrypted members -------------------------------------------------
+
+def _check_encrypted(info: ZipInfo) -> None:
+    """Reject members with the encryption flag set (metadata-only)."""
     if info.flag_bits & 0x01:
-        raise SecurityError(f"Encrypted ZIP member: {info.filename}")
+        raise SecurityError(f"Encrypted ZIP member")
 
-    # -- Unsupported compression type --------------------------------------
+
+def _check_compression(info: ZipInfo) -> None:
+    """Reject unsupported compression types (metadata-only)."""
     if info.compress_type not in (0, 8):  # 0=stored, 8=deflated
         raise SecurityError(
-            f"Unsupported compression type {info.compress_type} "
-            f"for member: {info.filename}"
+            f"Unsupported compression type {info.compress_type}"
         )
 
-    # -- Compression-ratio bomb --------------------------------------------
+
+def _check_special_entry(info: ZipInfo) -> None:
+    """Reject symlinks, device nodes, FIFOs, and sockets.
+
+    Checks Unix mode bits from ``external_attr`` (high 16 bits).
+    When no Unix mode is present (e.g. Windows-origin archives),
+    external_attr >> 16 is 0 and no special entry is detected.
+    """
+    mode = info.external_attr >> 16
+    if mode:
+        if (
+            stat.S_ISLNK(mode)
+            or stat.S_ISBLK(mode)
+            or stat.S_ISCHR(mode)
+            or stat.S_ISFIFO(mode)
+            or stat.S_ISSOCK(mode)
+        ):
+            raise SecurityError(f"Unsupported special-file ZIP entry")
+
+
+def _check_ratio(info: ZipInfo, limits: Dict[str, Any]) -> None:
+    """Reject decompression bombs based on compression ratio.
+
+    Operates on metadata only — only info.file_size and
+    info.compress_size are consulted.
+    """
     if info.compress_size > 0 and info.file_size > 0:
         ratio = info.file_size / info.compress_size
         if ratio > limits["max_compression_ratio"]:
             raise SecurityError(
                 f"Compression ratio {ratio:.2f} exceeds "
-                f"limit {limits['max_compression_ratio']} "
-                f"for member: {info.filename}"
+                f"limit {limits['max_compression_ratio']}"
             )
 
 
@@ -379,16 +431,11 @@ def _read_json_member(
 
     Raises ``LimitExceededError`` or ``ShardError`` on failure.
     """
-    if info.file_size > limits["max_json_uncompressed_bytes"]:
+    # Defensive check — per-member limit was already enforced in Phase 2.
+    if info.file_size > limits["max_member_uncompressed_bytes"]:
         raise LimitExceededError(
             f"Uncompressed size {info.file_size} of {info.filename} exceeds "
-            f"limit {limits['max_json_uncompressed_bytes']}"
-        )
-
-    if info.compress_size > limits["max_json_uncompressed_bytes"]:
-        raise LimitExceededError(
-            f"Compressed size {info.compress_size} of {info.filename} exceeds "
-            f"limit {limits['max_json_uncompressed_bytes']}"
+            f"limit {limits['max_member_uncompressed_bytes']}"
         )
 
     try:

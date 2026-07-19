@@ -75,9 +75,27 @@ documented in `constants.py` as Pilot A implementation limits.
 ### Testing
 
 ```bash
-cd /c/AI-Projects/extractor-agent
+git clone https://github.com/MarcoF9254/extractor-agent.git
+cd extractor-agent
 uv pip install -e ".[dev]"
 pytest tests/test_inventory.py -v
 ```
 
 All tests use **synthetic fixtures only** — no real ChatGPT export data.
+
+### Configuration limits
+
+The reader enforces configurable resource limits (Pilot A provisional values):
+
+| Limit | Default | Notes |
+|---|---|---|
+| `max_archive_entries` | 2,000 | Maximum ZIP member count |
+| `max_member_uncompressed_bytes` | 500 MB | Per-member uncompressed size |
+| `max_total_uncompressed_bytes` | 3 GB | Total archive uncompressed size |
+| `max_conversation_count` | 10,000 | Conversations across all shards |
+| `max_mapping_node_count` | 500,000 | Total mapping nodes |
+| `max_compression_ratio` | 100 | Compression ratio bomb threshold |
+
+These are implementation limits, not governance decisions. Callers may override
+via the ``limits`` parameter, but doing so relaxes admission protections.
+The CLI always uses the safe defaults above.
