@@ -2321,44 +2321,10 @@ class TestModuleCLI:
 
 class TestRecursionBoolSymlink:
     def test_recursion_in_manifest_reported_as_manifest_error(self):
-        """Deeply nested manifest JSON raises ManifestError.
-
-        Builds the JSON as a raw string to avoid RecursionError in
-        json.dumps during fixture creation.
-        """
-        import io
+        """Prove RecursionError from json.loads becomes ManifestError
+        via monkeypatch (deterministic, environment-independent)."""
+        import io, json as _real_json
         from zipfile import ZipFile, ZIP_DEFLATED
-
-        # Build a deeply nested JSON string: {"x": {"x": ... {"x": "end"} ... }}
-        inner = '"end"'
-        for i in range(2000):
-            inner = '{"x' + str(i) + '": ' + inner + '}'
-        nested_json = '{"version": 1, "nested": ' + inner + '}'
-
-        buf = io.BytesIO()
-        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
-            zf.writestr("export_manifest.json", nested_json.encode())
-
-        fd, path = tempfile.mkstemp(suffix=".zip")
-        os.write(fd, buf.getvalue())
-        os.close(fd)
-        try:
-            with pytest.raises(ManifestError):
-                build_inventory(path)
-        finally:            os.unlink(path)
-
-    def test_recursion_in_shard_reported_as_shard_error(self):
-        """Deeply nested shard JSON raises ShardError."""
-        import io
-        from zipfile import ZipFile, ZIP_DEFLATED
-
-        # Build deeply nested JSON as raw string (non-compressible keys)
-        inner = '"end"'
-        for i in range(2000):
-            inner = '{"x' + str(i) + '": ' + inner + '}'
-        shard_json = ('[{"conversation_id": "r", "mapping": {"n": {"id": "n", '
-                      '"message": null, "parent": null, "children": []}}, '
-                      '"nested": ' + inner + '}]')
 
         buf = io.BytesIO()
         with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
@@ -2368,15 +2334,68 @@ class TestRecursionBoolSymlink:
                     {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
                 "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
             }))
-            zf.writestr("conversations-000.json", shard_json.encode())
+            zf.writestr("conversations-000.json", json.dumps([
+                make_conversation(9997, [(0, make_message(role="user", content_type="text"))])
+            ]))
 
+        original_loads = _real_json.loads
+        call_count = 0
+
+        def _exploding_loads(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:  # manifest read
+                raise RecursionError("simulated deeply nested JSON")
+            return original_loads(*a, **kw)
+
+        _real_json.loads = _exploding_loads
         fd, path = tempfile.mkstemp(suffix=".zip")
         os.write(fd, buf.getvalue())
         os.close(fd)
         try:
-            with pytest.raises(ShardError):
+            with pytest.raises(ManifestError, match="Invalid JSON"):
                 build_inventory(path)
         finally:
+            _real_json.loads = original_loads
+            os.unlink(path)
+
+    def test_recursion_in_shard_reported_as_shard_error(self):
+        """Prove RecursionError from json.loads becomes ShardError
+        via monkeypatch (deterministic, environment-independent)."""
+        import io, json as _real_json
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
+            }))
+            zf.writestr("conversations-000.json", json.dumps([
+                make_conversation(9996, [(0, make_message(role="user", content_type="text"))])
+            ]))
+
+        original_loads = _real_json.loads
+        call_count = 0
+
+        def _exploding_on_second_call(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:  # shard read (manifest was first)
+                raise RecursionError("simulated deeply nested JSON shard")
+            return original_loads(*a, **kw)
+
+        _real_json.loads = _exploding_on_second_call
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, buf.getvalue())
+        os.close(fd)
+        try:
+            with pytest.raises(ShardError, match="Invalid JSON"):
+                build_inventory(path)
+        finally:
+            _real_json.loads = original_loads
             os.unlink(path)
 
     def test_boolean_version_rejected(self):
