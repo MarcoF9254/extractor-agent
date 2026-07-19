@@ -1116,8 +1116,8 @@ class TestResourceLimits:
         finally:
             remove_temp(path)
 
-    def test_exceeds_max_json_uncompressed(self):
-        """A JSON member larger than the limit is rejected."""
+    def test_exceeds_max_member_uncompressed(self):
+        """A member exceeding the per-member size limit is rejected."""
         small_limits = {**DEFAULT_LIMITS, "max_member_uncompressed_bytes": 100}
         # Build a conversation with enough data to exceed 100 bytes uncompressed.
         conv = make_conversation(
@@ -1982,13 +1982,15 @@ class TestNonDictMappingNode:
 
 class TestCompressionBomb:
     def test_high_compression_ratio_rejected(self):
-        """A member with suspiciously high compression ratio is rejected."""
-        # We use ZIP_STORED for uncompressed files, but set compress_size
-        # artificially small via raw ZIP construction for the ratio check.
-        # For stored entries, compress_size == file_size so ratio is 1.
-        # To trigger the bomb detector, we need a deflated entry.
+        """A deflated member with ratio > 100 raises SecurityError.
+
+        The manifest (small, normal compressibility) passes admission.
+        The shard member contains 1 MB of repetitive data that deflates
+        to ~1 KB, yielding a ratio ~1000 which exceeds the default
+        max_compression_ratio (100).  _check_ratio rejects it.
+        """
         import io
-        import zlib
+        from zipfile import ZipFile, ZIP_DEFLATED
 
         buf = io.BytesIO()
         with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
@@ -1996,9 +1998,7 @@ class TestCompressionBomb:
                 "version": 1,
                 "logical_files": {
                     "conversations.json": {
-                        "files": [
-                            "conversations-000.json"
-                        ],
+                        "files": ["conversations-000.json"],
                         "shard_count": 1,
                         "sharded": True,
                     },
@@ -2007,39 +2007,15 @@ class TestCompressionBomb:
                     {"path": "conversations-000.json", "size_bytes": 1000}
                 ],
             }))
-            # Store a very small amount of data for the manifest, then a bomb.
-            # Real bombs use highly repetitive data — compress to tiny ratio.
-            data = b"A" * 1_000_000  # 1 MB
-            zf.writestr("conversations-000.json", json.dumps([
-                make_conversation(
-                    conv_id_seed=700,
-                    node_seeds=[(0, make_message(
-                        role="user", content_type="text",
-                        parts=[data.decode("ascii", errors="replace")],
-                    ))],
-                )
-            ]))
+            # 1 MB of repetitive 'A' — deflates to ~1 KB, ratio ~1000
+            zf.writestr("conversations-000.json", b"A" * 1_000_000)
 
-        raw = buf.getvalue()
-        # The bomb has compression ratio well under 100 (1MB -> ~10KB).
-        # To actually exceed limit, we need to manually patch the sizes.
-        # For now, test with an artificially small max_compression_ratio.
-        small_limits = {**DEFAULT_LIMITS, "max_compression_ratio": 0.5}
-        path = write_temp_zip(raw)
+        path = write_temp_zip(buf.getvalue())
         try:
-            # With ratio limit 0.5, even stored entries (ratio=1.0) should fail
-            # if the file sizes are equal.
-            # The check only triggers when both > 0, ratio = uncompressed/compressed.
-            # For a normal deflated file, ratio is ~100, so with limit 0.5 it triggers.
-            # But since the check is file_size / compress_size, and for stored
-            # entries file_size == compress_size, ratio is 1.0 which is > 0.5.
-            # Actually the manifest is stored too. So this might fail on the manifest.
-            # Let me make the test simpler: use a very small ratio limit.
-            with pytest.raises((LimitExceededError, SecurityError)):
-                build_inventory(path, limits=small_limits)
+            with pytest.raises(SecurityError, match="Compression ratio"):
+                build_inventory(path)
         finally:
             remove_temp(path)
-
 
 # ======================================================================
 # Smoke: full-featured multi-shard with assets
@@ -2337,3 +2313,185 @@ class TestModuleCLI:
         assert cp.stdout == b""
         assert b"Error: ZipIntegrityError" in cp.stderr
         assert b"nonexistent" not in cp.stderr
+
+# ======================================================================
+# Recursion, boolean-as-int, and symlink evidence
+# ======================================================================
+
+
+class TestRecursionBoolSymlink:
+    def test_recursion_in_manifest_reported_as_manifest_error(self):
+        """Deeply nested manifest JSON raises ManifestError.
+
+        Builds the JSON as a raw string to avoid RecursionError in
+        json.dumps during fixture creation.
+        """
+        import io
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        # Build a deeply nested JSON string: {"x": {"x": ... {"x": "end"} ... }}
+        inner = '"end"'
+        for i in range(2000):
+            inner = '{"x' + str(i) + '": ' + inner + '}'
+        nested_json = '{"version": 1, "nested": ' + inner + '}'
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", nested_json.encode())
+
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, buf.getvalue())
+        os.close(fd)
+        try:
+            with pytest.raises(ManifestError):
+                build_inventory(path)
+        finally:            os.unlink(path)
+
+    def test_recursion_in_shard_reported_as_shard_error(self):
+        """Deeply nested shard JSON raises ShardError."""
+        import io
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        # Build deeply nested JSON as raw string (non-compressible keys)
+        inner = '"end"'
+        for i in range(2000):
+            inner = '{"x' + str(i) + '": ' + inner + '}'
+        shard_json = ('[{"conversation_id": "r", "mapping": {"n": {"id": "n", '
+                      '"message": null, "parent": null, "children": []}}, '
+                      '"nested": ' + inner + '}]')
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
+            }))
+            zf.writestr("conversations-000.json", shard_json.encode())
+
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, buf.getvalue())
+        os.close(fd)
+        try:
+            with pytest.raises(ShardError):
+                build_inventory(path)
+        finally:
+            os.unlink(path)
+
+    def test_boolean_version_rejected(self):
+        """manifest version=true raises ManifestError (bool != int)."""
+        import io
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": True,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
+            }))
+
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, buf.getvalue())
+        os.close(fd)
+        try:
+            with pytest.raises(ManifestError, match="version"):
+                build_inventory(path)
+        finally:
+            os.unlink(path)
+
+    def test_boolean_shard_count_rejected(self):
+        """shard_count=true raises ManifestError (bool != int)."""
+        import io
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": True, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
+            }))
+
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, buf.getvalue())
+        os.close(fd)
+        try:
+            with pytest.raises(ManifestError, match="shard_count"):
+                build_inventory(path)
+        finally:
+            os.unlink(path)
+
+    def test_symlink_e2e_rejected_before_read(self):
+        """A ZIP with a symlink-mode member is rejected by build_inventory
+        before any read/decompression occurs."""
+        import io
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
+            }))
+            zf.writestr("conversations-000.json", json.dumps([
+                make_conversation(5002, [(0, make_message(role="user", content_type="text"))])
+            ]))
+            # Patch external_attr to symlink mode — propagates to CD on close()
+            zf.filelist[-1].external_attr = (0o120777 << 16)
+
+        original_read = ZipFile.read
+        read_called = False
+        def _guard(self, *a, **kw):
+            nonlocal read_called
+            read_called = True
+            return original_read(self, *a, **kw)
+
+        ZipFile.read = _guard
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, buf.getvalue())
+        os.close(fd)
+        try:
+            with pytest.raises(SecurityError, match="special-file"):
+                build_inventory(path)
+            assert not read_called, "read() was called before symlink rejection"
+        finally:
+            ZipFile.read = original_read
+            os.unlink(path)
+
+    def test_symlink_e2e_cli_sanitized(self):
+        """CLI on a symlink ZIP: non-zero exit, empty stdout, sanitized stderr."""
+        import io, subprocess, sys
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
+            }))
+            zf.writestr("conversations-000.json", "[]")
+            zf.filelist[-1].external_attr = (0o120777 << 16)
+
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, buf.getvalue())
+        os.close(fd)
+        try:
+            cp = subprocess.run(
+                [sys.executable, "-m", "extractor_agent.inventory", path],
+                capture_output=True,
+                cwd=os.path.join(os.path.dirname(__file__), ".."),
+            )
+            assert cp.returncode != 0
+            assert cp.stdout == b""
+            assert b"Error: SecurityError" in cp.stderr
+            assert b"Traceback" not in cp.stderr
+        finally:
+            os.unlink(path)

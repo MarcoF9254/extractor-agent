@@ -101,7 +101,6 @@ def _build_inventory_inner(
     # -- Phase 2: Metadata-only admission (no reading / decompression) ------
     seen_names: Dict[str, ZipInfo] = {}
     total_uncompressed = 0
-    total_json_uncompressed = 0
     limit_member = limits["max_member_uncompressed_bytes"]
     limit_total = limits["max_total_uncompressed_bytes"]
 
@@ -122,8 +121,6 @@ def _build_inventory_inner(
             )
 
         total_uncompressed += info.file_size
-        if norm.endswith(".json"):
-            total_json_uncompressed += info.file_size
 
         seen_names[norm] = info
 
@@ -154,7 +151,10 @@ def _build_inventory_inner(
     if MANIFEST_NAME not in name_index:
         raise ManifestError(f"{MANIFEST_NAME} is missing from archive")
 
-    manifest_raw = _read_json_member(zf, name_index[MANIFEST_NAME], limits)
+    try:
+        manifest_raw = _read_json_member(zf, name_index[MANIFEST_NAME], limits)
+    except ShardError as exc:
+        raise ManifestError(str(exc)) from None
     if not isinstance(manifest_raw, dict):
         raise ManifestError(f"{MANIFEST_NAME} root is not a JSON object")
 
@@ -163,7 +163,7 @@ def _build_inventory_inner(
     # "version" is absent (fail-closed — do not treat an invented
     # fixture-only schema as canonical).
     version = manifest_raw.get("version")
-    if not isinstance(version, int):
+    if type(version) is not int:
         raise ManifestError(
             'Manifest field "version" is missing or not an integer'
         )
@@ -452,7 +452,7 @@ def _read_json_member(
 
     try:
         return json.loads(raw)
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, RecursionError) as exc:
         raise ShardError(
             f"Invalid JSON in ZIP member {info.filename}: {exc}"
         )
@@ -506,7 +506,7 @@ def _validate_logical_files(
         )
 
     shard_count = conv_entry.get("shard_count")
-    if not isinstance(shard_count, int):
+    if type(shard_count) is not int:
         raise ManifestError(
             '"shard_count" is missing or not an integer'
         )
