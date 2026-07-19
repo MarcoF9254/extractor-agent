@@ -101,8 +101,18 @@ class TestValidSingleShard:
         )
         manifest = {
             "version": 1,
-            "export_files": ["conversations-000.json"],
-            "logical_files": {},
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json"
+                    ],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000}
+            ],
         }
         zip_bytes = build_zip(
             manifest=manifest,
@@ -159,11 +169,20 @@ class TestValidMultiShard:
         )
         manifest = {
             "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json",
+                        "conversations-001.json"
+                    ],
+                    "shard_count": 2,
+                    "sharded": True,
+                }
+            },
             "export_files": [
-                "conversations-000.json",
-                "conversations-001.json",
+                {"path": "conversations-000.json", "size_bytes": 1000},
+                {"path": "conversations-001.json", "size_bytes": 1000}
             ],
-            "logical_files": {},
         }
         zip_bytes = build_zip(
             manifest=manifest,
@@ -296,8 +315,18 @@ class TestCorruptMember:
         with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
             zf.writestr("export_manifest.json", json.dumps({
                 "version": 1,
-                "export_files": ["conversations-000.json"],
-                "logical_files": {},
+                "logical_files": {
+                    "conversations.json": {
+                        "files": [
+                            "conversations-000.json"
+                        ],
+                        "shard_count": 1,
+                        "sharded": True,
+                    },
+                },
+                "export_files": [
+                    {"path": "conversations-000.json", "size_bytes": 1000}
+                ],
             }))
             zf.writestr("conversations-000.json", b"GARBAGE DATA NOT VALID JSON")
         path = write_temp_zip(buf.getvalue())
@@ -350,9 +379,19 @@ class TestMissingDeclaredShard:
         """Manifest declares shard that doesn't exist in the ZIP."""
         manifest = {
             "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json",
+                        "conversations-001.json"
+                    ],
+                    "shard_count": 2,
+                    "sharded": True,
+                }
+            },
             "export_files": [
-                "conversations-000.json",
-                "conversations-001.json",
+                {"path": "conversations-000.json", "size_bytes": 1000},
+                {"path": "conversations-001.json", "size_bytes": 1000}
             ],
         }
         conv = make_conversation(
@@ -380,8 +419,18 @@ class TestMalformedShardJson:
         """Shard contains invalid JSON."""
         manifest = {
             "version": 1,
-            "export_files": ["conversations-000.json"],
-            "logical_files": {},
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json"
+                    ],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000}
+            ],
         }
         zip_bytes = build_zip(
             manifest=manifest,
@@ -405,8 +454,18 @@ class TestNonArrayShard:
         """Shard top-level is an object, not an array."""
         manifest = {
             "version": 1,
-            "export_files": ["conversations-000.json"],
-            "logical_files": {},
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json"
+                    ],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000}
+            ],
         }
         zip_bytes = build_zip(
             manifest=manifest,
@@ -423,8 +482,18 @@ class TestNonArrayShard:
         """Shard top-level is a scalar, not an array."""
         manifest = {
             "version": 1,
-            "export_files": ["conversations-000.json"],
-            "logical_files": {},
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json"
+                    ],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000}
+            ],
         }
         zip_bytes = build_zip(
             manifest=manifest,
@@ -452,9 +521,19 @@ class TestDuplicateConversationIds:
         )
         manifest = {
             "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json",
+                        "conversations-001.json"
+                    ],
+                    "shard_count": 2,
+                    "sharded": True,
+                }
+            },
             "export_files": [
-                "conversations-000.json",
-                "conversations-001.json",
+                {"path": "conversations-000.json", "size_bytes": 1000},
+                {"path": "conversations-001.json", "size_bytes": 1000}
             ],
         }
         zip_bytes = build_zip(
@@ -732,8 +811,18 @@ class TestDuplicateMemberName:
         with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
             zf.writestr("export_manifest.json", json.dumps({
                 "version": 1,
-                "export_files": ["conversations-000.json"],
-                "logical_files": {},
+                "logical_files": {
+                    "conversations.json": {
+                        "files": [
+                            "conversations-000.json"
+                        ],
+                        "shard_count": 1,
+                        "sharded": True,
+                    },
+                },
+                "export_files": [
+                    {"path": "conversations-000.json", "size_bytes": 1000}
+                ],
             }))
             # Write the same name twice.
             conv = make_conversation(
@@ -792,8 +881,18 @@ class TestPathTraversal:
         with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
             zf.writestr("export_manifest.json", json.dumps({
                 "version": 1,
-                "export_files": ["conversations-000.json"],
-                "logical_files": {},
+                "logical_files": {
+                    "conversations.json": {
+                        "files": [
+                            "conversations-000.json"
+                        ],
+                        "shard_count": 1,
+                        "sharded": True,
+                    },
+                },
+                "export_files": [
+                    {"path": "conversations-000.json", "size_bytes": 1000}
+                ],
             }))
             zf.writestr("../etc/passwd", b"root:x:0:0:root:")
         path = write_temp_zip(buf.getvalue())
@@ -811,8 +910,18 @@ class TestPathTraversal:
         with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
             zf.writestr("export_manifest.json", json.dumps({
                 "version": 1,
-                "export_files": ["conversations-000.json"],
-                "logical_files": {},
+                "logical_files": {
+                    "conversations.json": {
+                        "files": [
+                            "conversations-000.json"
+                        ],
+                        "shard_count": 1,
+                        "sharded": True,
+                    },
+                },
+                "export_files": [
+                    {"path": "conversations-000.json", "size_bytes": 1000}
+                ],
             }))
             zf.writestr("/etc/passwd", b"root:x:0:0:root:")
         path = write_temp_zip(buf.getvalue())
@@ -838,8 +947,18 @@ class TestResourceLimits:
         with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
             zf.writestr("export_manifest.json", json.dumps({
                 "version": 1,
-                "export_files": ["conversations-000.json"],
-                "logical_files": {},
+                "logical_files": {
+                    "conversations.json": {
+                        "files": [
+                            "conversations-000.json"
+                        ],
+                        "shard_count": 1,
+                        "sharded": True,
+                    },
+                },
+                "export_files": [
+                    {"path": "conversations-000.json", "size_bytes": 1000}
+                ],
             }))
             zf.writestr("conversations-000.json", json.dumps([
                 make_conversation(
@@ -1046,37 +1165,278 @@ class TestMalformedManifest:
 
 
 # ======================================================================
-# Shard discovery fallback (pattern-based)
+# Shard discovery fail-closed (no fallback mode)
 # ======================================================================
 
 
-class TestShardDiscoveryFallback:
-    def test_manifest_no_shard_list(self):
-        """Manifest with no shard list falls back to pattern scanning."""
+class TestShardDiscoveryFailClosed:
+    def test_missing_logical_files_is_error(self):
+        """Manifest without logical_files raises ManifestError (no fallback)."""
         conv = make_conversation(
             conv_id_seed=300,
             node_seeds=[(0, make_message(role="user", content_type="text"))],
         )
-        manifest = {"version": 1}  # no shard list field
+        manifest = {"version": 1}
         zip_bytes = build_zip(
             manifest=manifest,
             extra_files={"conversations-000.json": json.dumps([conv]).encode()},
         )
         path = write_temp_zip(zip_bytes)
         try:
-            result = build_inventory(path)
-            assert result["conversation_count"] == 1
-            assert "conversations-000.json" in result["conversation_shards"]
+            with pytest.raises(ManifestError, match="logical_files"):
+                build_inventory(path)
         finally:
             remove_temp(path)
 
-    def test_no_shard_at_all(self):
-        """No shard file results in manifest error."""
+    def test_no_shard_at_all_is_error(self):
+        """Minimal manifest with no logical_files raises ManifestError."""
         manifest = {"version": 1}
-        zip_bytes = build_zip(manifest=manifest)  # no shards
+        zip_bytes = build_zip(manifest=manifest)
         path = write_temp_zip(zip_bytes)
         try:
-            with pytest.raises(ManifestError, match="No conversation shard"):
+            with pytest.raises(ManifestError, match="logical_files"):
+                build_inventory(path)
+        finally:
+            remove_temp(path)
+
+
+# ======================================================================
+# logical_files and export_files validation (fail-closed)
+# ======================================================================
+
+
+class TestLogicalFilesValidation:
+    def test_exact_live_manifest_shape(self):
+        """Accepts exact observed real manifest shape with all fields."""
+        conv = make_conversation(
+            conv_id_seed=350,
+            node_seeds=[(0, make_message(role="user", content_type="text"))],
+        )
+        manifest = {
+            "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": ["conversations-000.json"],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 6849141},
+            ],
+        }
+        zip_bytes = build_zip(
+            manifest=manifest,
+            shards={"conversations-000.json": [conv]},
+        )
+        path = write_temp_zip(zip_bytes)
+        try:
+            result = build_inventory(path)
+            assert result["conversation_count"] == 1
+            assert result["conversation_shards"] == ["conversations-000.json"]
+        finally:
+            remove_temp(path)
+
+    def test_shard_count_mismatch(self):
+        """shard_count != len(files) raises ManifestError."""
+        manifest = {
+            "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json",
+                        "conversations-001.json",
+                    ],
+                    "shard_count": 99,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000},
+                {"path": "conversations-001.json", "size_bytes": 1000},
+            ],
+        }
+        zip_bytes = build_zip(
+            manifest=manifest,
+            shards={
+                "conversations-000.json": [make_conversation(351, [(0, make_message(role="user", content_type="text"))])],
+                "conversations-001.json": [make_conversation(352, [(0, make_message(role="assistant", content_type="text"))])],
+            },
+        )
+        path = write_temp_zip(zip_bytes)
+        try:
+            with pytest.raises(ManifestError, match="shard_count"):
+                build_inventory(path)
+        finally:
+            remove_temp(path)
+
+    def test_duplicate_declared_shard(self):
+        """Duplicate shard filename in files list raises ManifestError."""
+        manifest = {
+            "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json",
+                        "conversations-000.json",
+                    ],
+                    "shard_count": 2,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000},
+            ],
+        }
+        zip_bytes = build_zip(
+            manifest=manifest,
+            shards={"conversations-000.json": [make_conversation(353, [(0, make_message(role="user", content_type="text"))])]},
+        )
+        path = write_temp_zip(zip_bytes)
+        try:
+            with pytest.raises(ManifestError, match="Duplicate shard"):
+                build_inventory(path)
+        finally:
+            remove_temp(path)
+
+    def test_declared_shard_absent_from_zip(self):
+        """Shard in files list but missing from ZIP raises ShardError."""
+        manifest = {
+            "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json",
+                        "conversations-001.json",
+                    ],
+                    "shard_count": 2,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000},
+                {"path": "conversations-001.json", "size_bytes": 1000},
+            ],
+        }
+        zip_bytes = build_zip(
+            manifest=manifest,
+            shards={"conversations-000.json": [make_conversation(354, [(0, make_message(role="user", content_type="text"))])]},
+        )
+        path = write_temp_zip(zip_bytes)
+        try:
+            with pytest.raises(ShardError, match="missing from archive"):
+                build_inventory(path)
+        finally:
+            remove_temp(path)
+
+    def test_declared_shard_absent_from_export_files(self):
+        """Shard declared in logical_files but missing from export_files."""
+        manifest = {
+            "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": ["conversations-000.json"],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "some_other_file.txt", "size_bytes": 100},
+            ],
+        }
+        conv = make_conversation(355, [(0, make_message(role="user", content_type="text"))])
+        zip_bytes = build_zip(
+            manifest=manifest,
+            extra_files={"conversations-000.json": json.dumps([conv]).encode()},
+        )
+        path = write_temp_zip(zip_bytes)
+        try:
+            with pytest.raises(ManifestError, match="missing from \"export_files\""):
+                build_inventory(path)
+        finally:
+            remove_temp(path)
+
+    def test_extra_zip_shard_not_declared(self):
+        """Extra conversations-NNN.json in ZIP outside declared files list."""
+        manifest = {
+            "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": ["conversations-000.json"],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000},
+            ],
+        }
+        conv = make_conversation(356, [(0, make_message(role="user", content_type="text"))])
+        zip_bytes = build_zip(
+            manifest=manifest,
+            shards={"conversations-000.json": [conv]},
+            extra_files={"conversations-001.json": json.dumps([
+                make_conversation(357, [(0, make_message(role="user", content_type="text"))]),
+            ]).encode()},
+        )
+        path = write_temp_zip(zip_bytes)
+        try:
+            with pytest.raises(ManifestError, match="Undeclared conversation shard"):
+                build_inventory(path)
+        finally:
+            remove_temp(path)
+
+    def test_duplicate_export_files_path(self):
+        """Duplicate path in export_files raises ManifestError."""
+        manifest = {
+            "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": ["conversations-000.json"],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000},
+                {"path": "conversations-000.json", "size_bytes": 2000},
+            ],
+        }
+        conv = make_conversation(358, [(0, make_message(role="user", content_type="text"))])
+        zip_bytes = build_zip(
+            manifest=manifest,
+            extra_files={"conversations-000.json": json.dumps([conv]).encode()},
+        )
+        path = write_temp_zip(zip_bytes)
+        try:
+            with pytest.raises(ManifestError, match="Duplicate.*export_files"):
+                build_inventory(path)
+        finally:
+            remove_temp(path)
+
+    def test_malformed_export_files_entry(self):
+        """export_files entry missing 'path' raises ManifestError."""
+        manifest = {
+            "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": ["conversations-000.json"],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"not_path": "conversations-000.json", "size_bytes": 1000},
+            ],
+        }
+        conv = make_conversation(359, [(0, make_message(role="user", content_type="text"))])
+        zip_bytes = build_zip(
+            manifest=manifest,
+            extra_files={"conversations-000.json": json.dumps([conv]).encode()},
+        )
+        path = write_temp_zip(zip_bytes)
+        try:
+            with pytest.raises(ManifestError, match="missing valid \"path\""):
                 build_inventory(path)
         finally:
             remove_temp(path)
@@ -1124,8 +1484,18 @@ class TestNonDictConversation:
         """A shard array entry that's an integer, not dict."""
         manifest = {
             "version": 1,
-            "export_files": ["conversations-000.json"],
-            "logical_files": {},
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json"
+                    ],
+                    "shard_count": 1,
+                    "sharded": True,
+                }
+            },
+            "export_files": [
+                {"path": "conversations-000.json", "size_bytes": 1000}
+            ],
         }
         zip_bytes = build_zip(
             manifest=manifest,
@@ -1215,8 +1585,18 @@ class TestCompressionBomb:
         with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
             zf.writestr("export_manifest.json", json.dumps({
                 "version": 1,
-                "export_files": ["conversations-000.json"],
-                "logical_files": {},
+                "logical_files": {
+                    "conversations.json": {
+                        "files": [
+                            "conversations-000.json"
+                        ],
+                        "shard_count": 1,
+                        "sharded": True,
+                    },
+                },
+                "export_files": [
+                    {"path": "conversations-000.json", "size_bytes": 1000}
+                ],
             }))
             # Store a very small amount of data for the manifest, then a bomb.
             # Real bombs use highly repetitive data — compress to tiny ratio.
@@ -1298,9 +1678,19 @@ class TestIntegration:
 
         manifest = {
             "version": 1,
+            "logical_files": {
+                "conversations.json": {
+                    "files": [
+                        "conversations-000.json",
+                        "conversations-001.json"
+                    ],
+                    "shard_count": 2,
+                    "sharded": True,
+                }
+            },
             "export_files": [
-                "conversations-000.json",
-                "conversations-001.json",
+                {"path": "conversations-000.json", "size_bytes": 1000},
+                {"path": "conversations-001.json", "size_bytes": 1000}
             ],
         }
 

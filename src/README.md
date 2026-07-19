@@ -76,7 +76,7 @@ documented in `constants.py` as Pilot A implementation limits.
 
 ```bash
 cd /c/AI-Projects/extractor-agent
-uv pip install pytest  # or: uv sync --group dev
+uv pip install -e ".[dev]"
 pytest tests/test_inventory.py -v
 ```
 

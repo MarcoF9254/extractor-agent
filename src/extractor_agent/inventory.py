@@ -24,7 +24,6 @@ from .constants import (
     ASSET_FILE_NAMES_NAME,
     LIBRARY_FILES_NAME,
     SHARD_PREFIX,
-    SHARD_LIST_FIELDS,
 )
 from .exceptions import (
     DuplicateConversationError,
@@ -143,14 +142,11 @@ def _build_inventory_inner(
     # The output preserves the provisional field name.
     export_manifest_version = version
 
-    # -- Discover conversation shards ---------------------------------------
-    shards = _discover_shards(manifest_raw, name_index)
-    if not shards:
-        raise ManifestError("No conversation shard is discoverable")
+    # -- Discover conversation shards via logical_files ---------------------
+    shards = _validate_logical_files(manifest_raw, name_index)
 
-    for s in shards:
-        if s not in name_index:
-            raise ShardError(f"Declared shard missing from archive: {s}")
+    # -- Cross-check declared shards against export_files -------------------
+    _validate_export_files_cross_check(manifest_raw, shards)
 
     # -- Process each shard --------------------------------------------------
     total_conversations = 0
@@ -413,34 +409,140 @@ def _read_json_member(
 _SHARD_RE = re.compile(rf"^{re.escape(SHARD_PREFIX)}\d{{3}}\.json$")
 
 
-def _discover_shards(
+def _validate_logical_files(
     manifest: Dict[str, Any],
     name_index: Dict[str, ZipInfo],
 ) -> List[str]:
-    """Discover conversation shard filenames from the manifest.
+    """Validate ``logical_files`` and return the authoritative shard list.
 
-    Preference order:
-    1. Explicit array in manifest (field names from SHARD_LIST_FIELDS).
-    2. Pattern-based fallback scanning ``conversations-NNN.json`` in the index.
+    The real ChatGPT export manifest declares shards at::
+
+        logical_files["conversations.json"]["files"]
+
+    Every fail-closed condition enumerated in Pilot A is checked here.
+
+    Returns
+    -------
+    List[str]
+        Sorted list of declared shard filenames that exist in the archive.
+
+    Raises
+    ------
+    ManifestError
+        For any missing, malformed, or inconsistent logical_files entry.
+    ShardError
+        For a declared shard that is missing from the ZIP.
     """
-    # Try explicit fields.
-    for field in SHARD_LIST_FIELDS:
-        raw = manifest.get(field)
-        if isinstance(raw, list) and len(raw) > 0:
-            shards: List[str] = []
-            for entry in raw:
-                if isinstance(entry, str):
-                    shards.append(entry)
-                elif isinstance(entry, dict):
-                    # Some manifests list dicts with a "file_name" field.
-                    fn = entry.get("file_name") or entry.get("filename")
-                    if isinstance(fn, str):
-                        shards.append(fn)
-            if shards:
-                return shards
+    logical_files = manifest.get("logical_files")
+    if not isinstance(logical_files, dict):
+        raise ManifestError(
+            '"logical_files" is missing or not an object'
+        )
 
-    # Fallback: scan name_index for shard-pattern files.
-    pattern_shards = sorted(
-        norm for norm in name_index if _SHARD_RE.match(norm)
-    )
-    return pattern_shards
+    conv_entry = logical_files.get("conversations.json")
+    if not isinstance(conv_entry, dict):
+        raise ManifestError(
+            '"logical_files" has no "conversations.json" entry '
+            "or it is not an object"
+        )
+
+    files = conv_entry.get("files")
+    if not isinstance(files, list) or len(files) == 0:
+        raise ManifestError(
+            '"conversations.json" "files" is missing, not an array, '
+            "or empty"
+        )
+
+    shard_count = conv_entry.get("shard_count")
+    if not isinstance(shard_count, int):
+        raise ManifestError(
+            '"shard_count" is missing or not an integer'
+        )
+
+    if conv_entry.get("sharded") is not True:
+        raise ManifestError(
+            '"sharded" must be true for the logical_files shard path'
+        )
+
+    if shard_count != len(files):
+        raise ManifestError(
+            f'"shard_count" ({shard_count}) does not match '
+            f'"files" count ({len(files)})'
+        )
+
+    seen: set = set()
+    shards: List[str] = []
+    for fname in files:
+        if not isinstance(fname, str) or fname == "":
+            raise ManifestError(
+                'Non-string or empty filename in "files" list'
+            )
+        if not _SHARD_RE.match(fname):
+            raise ManifestError(
+                f'Declared shard "{fname}" does not match expected '
+                f'pattern "{SHARD_PREFIX}NNN.json"'
+            )
+        if fname in seen:
+            raise ManifestError(
+                f'Duplicate shard filename in "files": {fname}'
+            )
+        seen.add(fname)
+        if fname not in name_index:
+            raise ShardError(
+                f'Declared shard missing from archive: {fname}'
+            )
+        shards.append(fname)
+
+    # Reject any top-level conversations-NNN.json outside the declared list.
+    for norm in name_index:
+        if _SHARD_RE.match(norm) and norm not in seen:
+            raise ManifestError(
+                f"Undeclared conversation shard in archive: {norm}"
+            )
+
+    return sorted(shards)
+
+
+def _validate_export_files_cross_check(
+    manifest: Dict[str, Any],
+    shards: List[str],
+) -> None:
+    """Cross-check every declared shard against ``export_files`` entries.
+
+    Every conversation shard declared via ``logical_files`` must have a
+    corresponding ``export_files`` entry with a matching ``path``.
+
+    Raises
+    ------
+    ManifestError
+        For missing, duplicate, or malformed export_files entries.
+    """
+    export_files = manifest.get("export_files")
+    if not isinstance(export_files, list):
+        raise ManifestError('"export_files" is missing or not an array')
+
+    seen_paths: set = set()
+    exported_shards: set = set()
+
+    for entry in export_files:
+        if not isinstance(entry, dict):
+            raise ManifestError("Non-object entry in \"export_files\"")
+        path = entry.get("path")
+        if not isinstance(path, str) or path == "":
+            raise ManifestError(
+                '"export_files" entry missing valid "path" field'
+            )
+        if path in seen_paths:
+            raise ManifestError(
+                f'Duplicate "export_files" path: {path}'
+            )
+        seen_paths.add(path)
+
+        if _SHARD_RE.match(path):
+            exported_shards.add(path)
+
+    for s in shards:
+        if s not in exported_shards:
+            raise ManifestError(
+                f'Declared shard "{s}" is missing from "export_files"'
+            )

@@ -30,5 +30,4 @@ SHARD_PREFIX = "conversations-"
 ASSET_FILE_NAMES_NAME = "conversation_asset_file_names.json"
 LIBRARY_FILES_NAME = "library_files.json"
 
-# Real ChatGPT export manifest field listing conversation shard filenames.
-SHARD_LIST_FIELDS = ("export_files",)
+# Authoritative shard declaration path: logical_files["conversations.json"]["files"]
