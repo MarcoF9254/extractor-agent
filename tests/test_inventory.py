@@ -34,6 +34,7 @@ from tests.fixtures.builders import (
     deterministic_json,
 )
 
+
 # ======================================================================
 # Helpers
 # ======================================================================
@@ -1820,3 +1821,111 @@ class TestMissingAuthorOrContent:
             assert result["role_counts"].get("user", 0) == 1
         finally:
             remove_temp(path)
+
+
+# ======================================================================
+# Module CLI — python -m extractor_agent.inventory
+# ======================================================================
+
+
+class TestModuleCLI:
+    """CLI smoke tests via subprocess — no real export data."""
+
+    @staticmethod
+    def _make_valid_zip() -> str:
+        """Write a minimal valid synthetic ZIP and return its path."""
+        conv = make_conversation(
+            2000, [(0, make_message(role="user", content_type="text"))]
+        )
+        data = build_zip(shards={"conversations-000.json": [conv]})
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, data)
+        os.close(fd)
+        return path
+
+    def test_cli_help(self):
+        """--help prints usage and exits zero."""
+        import subprocess
+        import sys
+
+        cp = subprocess.run(
+            [sys.executable, "-m", "extractor_agent.inventory", "--help"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.join(os.path.dirname(__file__), ".."),
+        )
+        assert cp.returncode == 0
+        assert "usage:" in cp.stdout
+        assert "input_zip" in cp.stdout
+
+    def test_cli_valid_zip_emits_json(self):
+        """Valid ZIP produces parseable JSON on stdout."""
+        import subprocess
+        import json
+        import sys
+
+        path = self._make_valid_zip()
+        try:
+            cp = subprocess.run(
+                [sys.executable, "-m", "extractor_agent.inventory", path],
+                capture_output=True, text=True,
+                cwd=os.path.join(os.path.dirname(__file__), ".."),
+            )
+            assert cp.returncode == 0, f"stderr: {cp.stderr}"
+            assert cp.stderr == ""
+            data = json.loads(cp.stdout)
+            assert data["conversation_count"] == 1
+            assert data["conversation_shards"] == ["conversations-000.json"]
+        finally:
+            os.unlink(path)
+
+    def test_cli_output_byte_identical(self):
+        """Two runs on the same ZIP produce identical stdout."""
+        import subprocess
+        import sys
+
+        path = self._make_valid_zip()
+        try:
+            cwd = os.path.join(os.path.dirname(__file__), "..")
+            cmd = [sys.executable, "-m", "extractor_agent.inventory", path]
+            r1 = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+            r2 = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+            assert r1.returncode == 0
+            assert r2.returncode == 0
+            assert r1.stdout == r2.stdout
+        finally:
+            os.unlink(path)
+
+    def test_cli_output_ends_with_newline(self):
+        """stdout ends with exactly one newline."""
+        import subprocess
+        import sys
+
+        path = self._make_valid_zip()
+        try:
+            cp = subprocess.run(
+                [sys.executable, "-m", "extractor_agent.inventory", path],
+                capture_output=True,
+                cwd=os.path.join(os.path.dirname(__file__), ".."),
+            )
+            assert cp.returncode == 0
+            assert cp.stdout.endswith(b"\n")
+            stripped = cp.stdout.rstrip(b"\n")
+            assert not stripped.endswith(b"\n")
+        finally:
+            os.unlink(path)
+
+    def test_cli_failure_exit_nonzero(self):
+        """Non-existent ZIP exits non-zero with nothing on stdout."""
+        import subprocess
+        import sys
+
+        cp = subprocess.run(
+            [sys.executable, "-m", "extractor_agent.inventory", "/nonexistent/input.zip"],
+            capture_output=True,
+            cwd=os.path.join(os.path.dirname(__file__), ".."),
+        )
+        assert cp.returncode != 0
+        assert cp.stdout == b""
+        assert b"Error: ZipIntegrityError" in cp.stderr
+        assert b"nonexistent" not in cp.stderr

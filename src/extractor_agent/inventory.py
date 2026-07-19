@@ -546,3 +546,45 @@ def _validate_export_files_cross_check(
             raise ManifestError(
                 f'Declared shard "{s}" is missing from "export_files"'
             )
+
+
+# ---------------------------------------------------------------------------
+# Module CLI — python -m extractor_agent.inventory INPUT_ZIP
+# ---------------------------------------------------------------------------
+
+
+if __name__ == "__main__":  # pragma: no cover
+    import argparse
+    import json
+    import sys
+
+    from .exceptions import InventoryError
+
+    parser = argparse.ArgumentParser(
+        description="ChatGPT export ZIP structural inventory (Pilot A)"
+    )
+    parser.add_argument(
+        "input_zip",
+        help="Path to a ChatGPT data-export ZIP file",
+    )
+    args = parser.parse_args()
+
+    try:
+        inventory = build_inventory(args.input_zip)
+        json.dump(
+            inventory,
+            sys.stdout,
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ": "),
+        )
+        sys.stdout.write("\n")
+    except InventoryError as exc:
+        # Sanitize: emit only the exception type; do not leak
+        # absolute paths, conversation IDs, or message content.
+        print(
+            f"Error: {type(exc).__name__}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
