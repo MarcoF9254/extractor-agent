@@ -101,3 +101,48 @@ Extraction must not assign approved, canonical, mature, promoted, deprecated, or
 ### Consequences
 
 Consumers can distinguish unusable artifacts from structurally valid candidates that still need semantic evaluation. Promotion remains downstream and owner-governed.
+
+## ADR-006: Pilot A bounded structural-inventory implementation
+
+**Status:** Accepted
+**Approved:** 2026-07-19
+**Source decision:** Owner exception
+
+### Context
+
+The repository's prior hard hold prohibited parser, validator, and CLI
+implementation. The Owner explicitly authorized Pilot A at its exact
+reviewed head as a bounded exception to that hold. This ADR records that
+already-authorized exception and its limits; it does not establish a
+general exception policy for future implementations.
+
+### Decision
+
+Authorize a single bounded exception for Pilot A: a deterministic structural
+inventory reader for ChatGPT export ZIP archives.
+
+The exception is bounded by:
+
+- **No extraction semantics** — the reader outputs archive structure only
+  (logical_files, export_files, shard layout, structural counts). It does not
+  output conversation text, titles, user metadata, attachment names, or any
+  extraction-candidate knowledge.
+- **No LLM involvement** — the reader is a pure function of the ZIP structure
+  and manifest JSON. No model is invoked.
+- **No downstream activation** — the reader does not trigger consolidation,
+  identity resolution, maturity assessment, approval, promotion, KB writes,
+  or any downstream pipeline.
+- **No schema ratification** — the reader's output format remains Pilot A
+  provisional. It does not ratify the Extraction Contract, Conversation
+  Profile, or any schema as a cross-stage standard.
+- **No further expansion** — this exception authorizes only the merged
+  Pilot A implementation. No additional parser, validator, renderer, or CLI
+  is authorized without a new Owner decision.
+
+### Consequences
+
+Pilot A provides reproducible structural-inventory evidence for ChatGPT ZIP
+exports ahead of the full extraction pipeline. All other implementation
+prohibitions (provider adapter, extraction parser, LLM runner, consolidation,
+KB writes) remain in full effect. Future implementation proposals must obtain
+separate Owner authorization.
