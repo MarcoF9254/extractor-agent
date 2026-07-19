@@ -32,7 +32,7 @@ ChatGPT data-export ZIP archives. Its scope is:
 - `logical_files` shard discovery from `export_manifest.json`;
 - `export_files` cross-check;
 - fail-closed validation (ManifestError, ShardError, SecurityError,
-  ZipIntegrityError, ResourceLimitError);
+  ZipIntegrityError, LimitExceededError);
 - deterministic JSON output to stdout;
 - admission-order instrumentation proving security checks precede reads;
 - synthetic fixture tests (82 passing on Python 3.11/3.12).

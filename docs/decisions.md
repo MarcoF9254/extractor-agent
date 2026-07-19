@@ -110,13 +110,11 @@ Consumers can distinguish unusable artifacts from structurally valid candidates 
 
 ### Context
 
-The repository's Stage 0 architecture baseline and hard-hold rules prohibit
-implementation of a parser, validator, or CLI until specification precedes
-code. However, the ChatGPT export ZIP format is a fixed, well-known third-party
-format (not an LLM-extraction contract), making its structural reader a
-deterministic engineering task rather than extraction-specification work.
-Delaying the reader behind the full specification pipeline would create an
-unnecessary blocker for structural-inventory evidence.
+The repository's prior hard hold prohibited parser, validator, and CLI
+implementation. The Owner explicitly authorized Pilot A at its exact
+reviewed head as a bounded exception to that hold. This ADR records that
+already-authorized exception and its limits; it does not establish a
+general exception policy for future implementations.
 
 ### Decision
 
