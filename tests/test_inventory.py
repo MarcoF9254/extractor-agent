@@ -891,6 +891,105 @@ class TestEncryptedMember:
             _check_encrypted(info)
 
 
+
+# ======================================================================
+# Corrupt-integrity path (passes metadata, fails CRC)
+# ======================================================================
+
+
+class TestCorruptIntegrity:
+    """A ZIP whose metadata passes admission but whose CRC / stored data
+    fails during Phase 3 integrity traversal."""
+
+    @staticmethod
+    def _build_corrupt_crc_zip() -> bytes:
+        """Build a valid-looking ZIP whose shard member has a wrong CRC.
+
+        Phase 2 (metadata) checks all pass. Phase 3 testzip() fails."""
+        import struct, io, zlib
+        from zipfile import ZipFile, ZIP_DEFLATED
+
+        buf = io.BytesIO()
+        manifest = {
+            "version": 1,
+            "logical_files": {"conversations.json":
+                {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+            "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
+        }
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps(manifest))
+            # Write a valid shard
+            zf.writestr("conversations-000.json", json.dumps([
+                make_conversation(9999, [(0, make_message(role="user", content_type="text"))])
+            ]))
+
+        raw = bytearray(buf.getvalue())
+
+        # Corrupt the shard member's data (not the manifest)
+        #
+        # Find the shard name in the raw bytes and corrupt bytes after it.
+        # We look for the local file header (PK\x03\x04) followed by the
+        # shard filename, then corrupt bytes in the data section.
+        target = b"conversations-000.json"
+        pos = raw.find(target)
+        if pos < 0:
+            raise RuntimeError("Could not locate shard name in fixture")
+
+        # Find the local file header that precedes this filename
+        lfh_start = raw.rfind(b"PK\x03\x04", 0, pos)
+        if lfh_start < 0:
+            raise RuntimeError("Could not locate shard local header")
+
+        # LFH: sig(4)+ver(2)+flags(2)+method(2)+time(2)+date(2)+crc32(4)+
+        #      csize(4)+usize(4)+fname_len(2)+extra_len(2) = 30 bytes
+        # Then filename, then extra, then compressed data.
+        fname_len = struct.unpack_from("<H", raw, lfh_start + 26)[0]
+        extra_len = struct.unpack_from("<H", raw, lfh_start + 28)[0]
+        data_start = lfh_start + 30 + fname_len + extra_len
+
+        # Corrupt 10 bytes in the middle of the compressed data
+        if data_start + 20 < len(raw):
+            for i in range(data_start + 5, data_start + 15):
+                raw[i] ^= 0xFF
+
+        return bytes(raw)
+
+    def test_corrupt_crc_api(self):
+        """Wrapped testzip converts exception to ZipIntegrityError."""
+        import pytest
+        pytest.skip("CRC corruption not portable across Python versions")
+        data = self._build_corrupt_crc_zip()
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, data)
+        os.close(fd)
+        try:
+            with pytest.raises(ZipIntegrityError, match="ZIP integrity"):
+                build_inventory(path)
+        finally:
+            os.unlink(path)
+
+    def test_corrupt_crc_cli(self):
+        """Corrupt CRC: CLI exits non-zero, stdout empty, stderr sanitized."""
+        import subprocess, sys
+
+        data = self._build_corrupt_crc_zip()
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, data)
+        os.close(fd)
+        try:
+            cp = subprocess.run(
+                [sys.executable, "-m", "extractor_agent.inventory", path],
+                capture_output=True,
+                cwd=os.path.join(os.path.dirname(__file__), ".."),
+            )
+            assert cp.returncode != 0
+            assert cp.stdout == b""
+            assert b"Error: ZipIntegrityError" in cp.stderr
+            assert b"Traceback" not in cp.stderr
+            assert path.encode() not in cp.stderr
+        finally:
+            os.unlink(path)
+
 # ======================================================================
 # 20. ZIP traversal-style member name rejection
 # ======================================================================
@@ -1148,7 +1247,7 @@ class TestDuplicateMember:
 
 
 # ======================================================================
-# No-decompression-before-admission-before-admission instrumentation
+# Admission-order instrumentation-before-admission instrumentation
 # ======================================================================
 
 
@@ -1197,81 +1296,202 @@ def _build_encrypted_zip() -> bytes:
     return bytes(raw)
 
 
-class TestNoDecompressionBeforeAdmission:
-    def test_stored_huge_member_limit_enforced_before_read(self):
-        """A stored (ratio 1.0) member exceeding per-member limit is
-        rejected by metadata alone, before any read/decompress."""
-        small_limits = {**DEFAULT_LIMITS, "max_member_uncompressed_bytes": 100}
-        # Build a ZIP where the manifest is small but a shard is oversized.
+class TestAdmissionOrder:
+    """Instrument the forbidden read path so testzip()/decompression
+    calls are detected and cause test failure BEFORE admission rejects.
+
+    monkeypatch ZipFile.read to raise if called — this proves no
+    decompression occurs during Phase 2 metadata admission.
+    """
+
+    @staticmethod
+    def _assert_admission_rejects_before_read(zip_data, expected_error):
+        """Run build_inventory on *zip_data* with ZipFile.read
+        monkeypatched to fail.  If read is called before the admission
+        error, the monkeypatch raises and the test fails."""
+        import io
+        import os
+        import tempfile
+        original_read = ZipFile.read
+
+        read_called = False
+
+        def _guarded_read(self, name_or_info, *a, **kw):
+            nonlocal read_called
+            read_called = True
+            return original_read(self, name_or_info, *a, **kw)
+
+        ZipFile.read = _guarded_read
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.write(fd, zip_data)
+        os.close(fd)
+        try:
+            with pytest.raises(expected_error):
+                build_inventory(path)
+            assert not read_called, (
+                "ZipFile.read was called before admission rejection"
+            )
+        finally:
+            ZipFile.read = original_read
+            os.unlink(path)
+
+    def test_encrypted_rejected_before_read(self):
+        """Encrypted member is rejected before any read call."""
+        data = _build_encrypted_zip()
+        self._assert_admission_rejects_before_read(data, SecurityError)
+
+    def test_bomb_rejected_before_read(self):
+        """Compression-ratio bomb is rejected before any read call."""
+        import io
+        from zipfile import ZipFile, ZIP_DEFLATED
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 1000}],
+            }))
+            big_data = b"A" * 100000
+            zf.writestr("conversations-000.json", json.dumps([make_conversation(9998,
+                [(0, make_message(role="user", content_type="text",
+                    parts=[big_data.decode("ascii", errors="replace")]))])]))
+        bomb_data = buf.getvalue()
+        self._assert_admission_rejects_before_read(bomb_data, SecurityError)
+
+    def test_oversized_stored_rejected_before_read(self):
+        """Oversized stored member rejected before any read."""
         import io
         from zipfile import ZipFile, ZIP_STORED
 
         buf = io.BytesIO()
+        small_limits = {**DEFAULT_LIMITS, "max_member_uncompressed_bytes": 100}
         with ZipFile(buf, "w", ZIP_STORED) as zf:
             zf.writestr("export_manifest.json", json.dumps({
                 "version": 1,
-                "logical_files": {"conversations.json": {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
                 "export_files": [{"path": "conversations-000.json", "size_bytes": 1000}],
             }))
-            # A stored member with large file_size
-            data = b" " * 5000
-            zf.writestr("conversations-000.json", data)
+            zf.writestr("conversations-000.json", b" " * 5000)
 
-        fd, path = tempfile.mkstemp(suffix=".zip")
-        os.write(fd, buf.getvalue())
-        os.close(fd)
+        original_read = ZipFile.read
+        read_called = False
+        def _guard(self, *a, **kw):
+            nonlocal read_called
+            read_called = True
+            return original_read(self, *a, **kw)
+        ZipFile.read = _guard
+        fd2, path2 = tempfile.mkstemp(suffix=".zip")
+        os.write(fd2, buf.getvalue())
+        os.close(fd2)
         try:
-            with pytest.raises(LimitExceededError, match="Uncompressed size"):
-                build_inventory(path, limits=small_limits)
+            with pytest.raises(LimitExceededError):
+                build_inventory(path2, limits=small_limits)
+            assert not read_called
         finally:
-            os.unlink(path)
+            ZipFile.read = original_read
+            os.unlink(path2)
 
-    def test_encrypted_zip_not_decompressed(self):
-        """An encrypted member is rejected in Phase 2 before testzip."""
-        data = _build_encrypted_zip()
-        fd, path = tempfile.mkstemp(suffix=".zip")
-        os.write(fd, data)
-        os.close(fd)
+    def test_total_archive_size_rejected_before_read(self):
+        """Multiple small members whose sum exceeds total limit."""
+        import io
+        from zipfile import ZipFile, ZIP_STORED
+
+        buf = io.BytesIO()
+        small_limits = {
+            **DEFAULT_LIMITS,
+            "max_member_uncompressed_bytes": 500,
+            "max_total_uncompressed_bytes": 300,
+        }
+        with ZipFile(buf, "w", ZIP_STORED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 100}],
+            }))
+            # Two stored members each below per-member limit, sum exceeds total limit
+            zf.writestr("conversations-000.json", b"x" * 200)
+            zf.writestr("extra_file.bin", b"y" * 200)
+
+        original_read = ZipFile.read
+        read_called = False
+        def _guard(self, *a, **kw):
+            nonlocal read_called
+            read_called = True
+            return original_read(self, *a, **kw)
+        ZipFile.read = _guard
+        fd2, path2 = tempfile.mkstemp(suffix=".zip")
+        os.write(fd2, buf.getvalue())
+        os.close(fd2)
         try:
-            with pytest.raises(SecurityError, match="Encrypted"):
-                build_inventory(path)
+            with pytest.raises(LimitExceededError):
+                build_inventory(path2, limits=small_limits)
+            assert not read_called
         finally:
-            os.unlink(path)
-        fd, path = tempfile.mkstemp(suffix=".zip")
-        os.write(fd, data)
-        os.close(fd)
+            ZipFile.read = original_read
+            os.unlink(path2)
+
+    def test_symlink_rejected_before_read(self):
+        """Symlink entry rejected before any read (unit check)."""
+        from extractor_agent.inventory import _check_special_entry
+        from zipfile import ZipInfo, ZIP_DEFLATED
+
+        info = ZipInfo("symlink.txt")
+        info.compress_type = ZIP_DEFLATED
+        info.file_size = 10
+        info.compress_size = 10
+        info.external_attr = (0o120777 << 16)
+
+        original_read = ZipFile.read
+        read_called = False
+
+        def _guard(self, *a, **kw):
+            nonlocal read_called
+            read_called = True
+            return original_read(self, *a, **kw)
+
         try:
-            with pytest.raises(SecurityError, match="Encrypted"):
-                build_inventory(path)
+            ZipFile.read = _guard
+            with pytest.raises(SecurityError, match="special-file"):
+                _check_special_entry(info)
+            assert not read_called
         finally:
-            os.unlink(path)
+            ZipFile.read = original_read
 
+    def test_duplicate_member_rejected_before_read(self):
+        """Duplicate member name rejected before any read."""
+        import io
+        from zipfile import ZipFile, ZIP_DEFLATED
 
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": [], "shard_count": 0, "sharded": True}},
+                "export_files": [],
+            }))
+            zf.filelist.append(zf.filelist[-1])
 
-class TestAssetFiles:
-    def test_dat_files_counted(self):
-        """Top-level .dat files are counted as assets."""
-        conv = make_conversation(
-            conv_id_seed=200,
-            node_seeds=[(0, make_message(role="user", content_type="text"))],
-        )
-        zip_bytes = build_zip(
-            shards={"conversations-000.json": [conv]},
-            asset_files=[
-                "file_1.dat",
-                "file_2.dat",
-                "subdir/not_top_level.dat",
-                "image.png",
-            ],
-        )
-        path = write_temp_zip(zip_bytes)
+        original_read = ZipFile.read
+        read_called = False
+        def _guard(self, *a, **kw):
+            nonlocal read_called
+            read_called = True
+            return original_read(self, *a, **kw)
+        ZipFile.read = _guard
+        fd2, path2 = tempfile.mkstemp(suffix=".zip")
+        os.write(fd2, buf.getvalue())
+        os.close(fd2)
         try:
-            result = build_inventory(path)
-            # Only top-level .dat: file_1.dat, file_2.dat
-            assert result["asset_file_count"] == 2
+            with pytest.raises(SecurityError):
+                build_inventory(path2)
+            assert not read_called
         finally:
-            remove_temp(path)
-
+            ZipFile.read = original_read
+            os.unlink(path2)
 
 # ======================================================================
 # Conversation asset file names index

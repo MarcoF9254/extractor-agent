@@ -138,9 +138,14 @@ def _build_inventory_inner(
     # testzip() performs CRC / truncated-member verification by reading and
     # decompressing — it is safe to call now because every member has been
     # admitted on metadata alone.
-    bad = zf.testzip()
+    # Every exception is converted fail-closed to ZipIntegrityError.
+    # Suppress exception chaining to prevent traceback exposure.
+    try:
+        bad = zf.testzip()
+    except Exception:
+        raise ZipIntegrityError("ZIP integrity check failed") from None
     if bad is not None:
-        raise ZipIntegrityError(f"ZIP integrity check failed on member: {bad}")
+        raise ZipIntegrityError("ZIP integrity check failed") from None
 
     # -- Phase 4: Build name_index (safe to read now) -----------------------
     name_index = dict(seen_names)
