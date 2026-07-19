@@ -803,44 +803,6 @@ class TestAbsentLibraryMetadata:
 # ======================================================================
 
 
-class TestDuplicateMemberName:
-    def test_duplicate_member_rejected(self):
-        """Two ZIP entries with the same name must be rejected."""
-        import io
-
-        buf = io.BytesIO()
-        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
-            zf.writestr("export_manifest.json", json.dumps({
-                "version": 1,
-                "logical_files": {
-                    "conversations.json": {
-                        "files": [
-                            "conversations-000.json"
-                        ],
-                        "shard_count": 1,
-                        "sharded": True,
-                    },
-                },
-                "export_files": [
-                    {"path": "conversations-000.json", "size_bytes": 1000}
-                ],
-            }))
-            # Write the same name twice.
-            conv = make_conversation(
-                conv_id_seed=130,
-                node_seeds=[(0, make_message(role="user", content_type="text"))],
-            )
-            zf.writestr("conversations-000.json", json.dumps([conv]))
-            # Second entry with same name — ZipFile won't allow this via writestr
-            # with the same ZipInfo, but we can use a raw overwrite.
-            # Actually, Python's ZipFile silently overwrites duplicate names.
-            # To properly test, we need to construct the ZIP at a lower level.
-            # For now, skip this — the implementation checks name_index which
-            # would catch the last entry as duplicate. We'll simulate by
-            # using a raw approach.
-        # Since ZipFile deduplicates on write, we skip this assertion
-        # and note the limitation. A real duplicate requires manual ZIP construction.
-        pytest.skip("Python ZipFile deduplicates on write; needs raw ZIP construction")
 
 
 # ======================================================================
@@ -955,17 +917,36 @@ class TestCorruptIntegrity:
         return bytes(raw)
 
     def test_corrupt_crc_api(self):
-        """Wrapped testzip converts exception to ZipIntegrityError."""
-        import pytest
-        pytest.skip("CRC corruption not portable across Python versions")
-        data = self._build_corrupt_crc_zip()
+        """Prove testzip exceptions are converted to ZipIntegrityError
+        by monkeypatching testzip to raise an arbitrary exception."""
+        from zipfile import ZipFile, ZIP_DEFLATED, BadZipFile
+        import io
+
+        buf = io.BytesIO()
+        with ZipFile(buf, "w", ZIP_DEFLATED) as zf:
+            zf.writestr("export_manifest.json", json.dumps({
+                "version": 1,
+                "logical_files": {"conversations.json":
+                    {"files": ["conversations-000.json"], "shard_count": 1, "sharded": True}},
+                "export_files": [{"path": "conversations-000.json", "size_bytes": 10}],
+            }))
+            zf.writestr("conversations-000.json", json.dumps([
+                make_conversation(9999, [(0, make_message(role="user", content_type="text"))])
+            ]))
+
+        original_testzip = ZipFile.testzip
+        def _exploding_testzip(self):
+            raise BadZipFile("Simulated CRC corruption")
+
         fd, path = tempfile.mkstemp(suffix=".zip")
-        os.write(fd, data)
+        os.write(fd, buf.getvalue())
         os.close(fd)
         try:
+            ZipFile.testzip = _exploding_testzip
             with pytest.raises(ZipIntegrityError, match="ZIP integrity"):
                 build_inventory(path)
         finally:
+            ZipFile.testzip = original_testzip
             os.unlink(path)
 
     def test_corrupt_crc_cli(self):
