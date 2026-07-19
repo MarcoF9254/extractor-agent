@@ -101,3 +101,50 @@ Extraction must not assign approved, canonical, mature, promoted, deprecated, or
 ### Consequences
 
 Consumers can distinguish unusable artifacts from structurally valid candidates that still need semantic evaluation. Promotion remains downstream and owner-governed.
+
+## ADR-006: Pilot A bounded structural-inventory implementation
+
+**Status:** Accepted
+**Approved:** 2026-07-19
+**Source decision:** Owner exception
+
+### Context
+
+The repository's Stage 0 architecture baseline and hard-hold rules prohibit
+implementation of a parser, validator, or CLI until specification precedes
+code. However, the ChatGPT export ZIP format is a fixed, well-known third-party
+format (not an LLM-extraction contract), making its structural reader a
+deterministic engineering task rather than extraction-specification work.
+Delaying the reader behind the full specification pipeline would create an
+unnecessary blocker for structural-inventory evidence.
+
+### Decision
+
+Authorize a single bounded exception for Pilot A: a deterministic structural
+inventory reader for ChatGPT export ZIP archives.
+
+The exception is bounded by:
+
+- **No extraction semantics** — the reader outputs archive structure only
+  (logical_files, export_files, shard layout, structural counts). It does not
+  output conversation text, titles, user metadata, attachment names, or any
+  extraction-candidate knowledge.
+- **No LLM involvement** — the reader is a pure function of the ZIP structure
+  and manifest JSON. No model is invoked.
+- **No downstream activation** — the reader does not trigger consolidation,
+  identity resolution, maturity assessment, approval, promotion, KB writes,
+  or any downstream pipeline.
+- **No schema ratification** — the reader's output format remains Pilot A
+  provisional. It does not ratify the Extraction Contract, Conversation
+  Profile, or any schema as a cross-stage standard.
+- **No further expansion** — this exception authorizes only the merged
+  Pilot A implementation. No additional parser, validator, renderer, or CLI
+  is authorized without a new Owner decision.
+
+### Consequences
+
+Pilot A provides reproducible structural-inventory evidence for ChatGPT ZIP
+exports ahead of the full extraction pipeline. All other implementation
+prohibitions (provider adapter, extraction parser, LLM runner, consolidation,
+KB writes) remain in full effect. Future implementation proposals must obtain
+separate Owner authorization.
