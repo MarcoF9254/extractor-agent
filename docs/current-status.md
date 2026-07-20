@@ -41,25 +41,24 @@ ChatGPT data-export ZIP archives. Its scope is:
 prohibition on implementation (see Hard holds below). No further
 implementation beyond Pilot A is authorized.
 
-## Source fixture blocker — G1-A source selection recorded, G1-B exact-source admission gate open
+## Source fixture blocker — G1-A source selection recorded, G1-B exact-source admission gate closed
 
 The repository contains historical extraction outputs, not their complete bounded Stage transcripts.
 
 **G1-A complete (2026-07-20):** Source selection record for `engineering-stage-01` (Stage 1) is established in `docs/admissions/g1-source-fixture-admission.md`:
 
 * ✅ Source identity, provenance, and bounded scope documented
-* ✅ Provisional sensitive-data assessment recorded (pending direct source inspection)
 * ✅ Private handling rules defined (source stays outside repository)
 * ✅ Historical outputs confirmed as comparison evidence only
 
-**G1-B still required** before any extraction run:
+**G1-B complete (2026-07-20):** All four G1-B exact-source admission requirements are satisfied:
 
-* ⏳ Direct inspection of the actual source artifact by the Owner/source provider
-* ⏳ Final sensitive-data determination (`cleared` or `redacted_derivative`)
-* ⏳ Relation determination (`original` vs `redacted_derivative`)
-* ⏳ SHA-256 digest of the exact admitted artifact recorded in the admission record
+* ✅ Direct inspection of the actual source artifact by the Owner/source provider — confirmed
+* ✅ Final sensitive-data determination — `cleared_for_private_evaluation`
+* ✅ Relation determination — `original`
+* ✅ SHA-256 digest recorded — `7184dcc452e948bac8e11ea2e494c18b84d201c678391530753469e13e311c72`
 
-The source fixture blocker persists until G1-B is closed.
+The source fixture blocker is resolved for admission. The G1 source (`engineering-stage-01`) is fully admitted. Execution is a separate gate — no extraction run is authorized by this admission.
 
 ## Validation required before approval (post-Pilot-A)
 
