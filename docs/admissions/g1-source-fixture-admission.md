@@ -1,8 +1,9 @@
 # G1 Source Fixture Admission
 
-**Status:** Proposal — Draft PR under review
+**Status:** Proposal — Draft PR under review; G1-A source-selection record complete, G1-B exact-source admission gate open
 **Admission ID:** G1
 **Created:** 2026-07-20
+**Last patched:** 2026-07-20
 **Associated branch:** `docs/admissions/g1-source-fixture-admission`
 
 ---
@@ -38,37 +39,60 @@ The admitted source is **exactly one** ChatGPT conversation transcript:
 
 ---
 
+## 3b. Admission Framework — G1-A and G1-B
+
+This admission record distinguishes two phases:
+
+| Phase | What it establishes | Status |
+|---|---|---|
+| **G1-A — Source selection / admission candidate** | Source identity (`engineering-stage-01`), provenance, bounded scope, private handling rules, historical-output status | ✅ Complete in this record |
+| **G1-B — Exact source admission gate** | Direct inspection of actual source artifact, final sensitive-data determination, `original` vs `redacted_derivative` decision, SHA-256 binding of exact admitted bytes **before execution** | ⏳ Outstanding — see Sections 4–6 below |
+
+**The source is not fully admitted for execution until G1-B is closed.** G1-A establishes *what* source was selected and *why*; G1-B establishes *exactly which bytes* will be used and that they pass the sensitivity gate.
+
+---
+
 ## 4. Sensitive-Data Assessment
+
+**Status:** Provisional / pending direct source inspection — G1-B gate not yet closed
 
 | Field | Value |
 |---|---|
-| **outcome** | `cleared` |
+| **outcome** | `pending_source_inspection` |
 | **checked_at** | 2026-07-20 |
 | **checked_by** | Agent preflight — G1 admission author |
-| **notes** | Assessment was performed by examining the historical extraction output `tests/fixtures/stage-outputs/stage-01.md`, which contains only engineering knowledge content: engineering principles, architecture patterns, development workflow strategies, testing approaches, repository practices, pitfalls, and decision heuristics. No personal data (names, email addresses, phone numbers, physical addresses), credentials (API keys, passwords, tokens), confidential business information, financial data, health information, or personally identifiable information of any kind is present in the extracted output. The original source transcript is expected to contain equivalent engineering-focused discussion content. The definitive inspection of the original transcript should be confirmed by the source provider before a run. If the source provider identifies restricted content not visible in the extraction output, a redacted derivative must be recorded and a new admission documented. |
+| **scope** | Historical extraction output `tests/fixtures/stage-outputs/stage-01.md` |
+| **notes** | Assessment was performed against the historical extraction output only. The extracted content contains only engineering knowledge (principles, patterns, workflows, practices, pitfalls). No personal data, credentials, or confidential material is visible in the extracted output. **The original Stage 1 transcript itself has not been directly inspected.** The definitive sensitive-data determination requires the Owner/source provider to inspect the actual source artifact. If restricted content is found, a redacted derivative must be created and recorded. |
+
+**G1-B requirement:** Direct inspection of the actual source artifact by the Owner/source provider, followed by a final outcome of `cleared` or `redacted_derivative`. Until that inspection is recorded, the sensitive-data gate is not closed.
 
 ---
 
 ## 5. Evaluation Source Determination
 
+**Status:** Pending — depends on G1-B sensitive-data gate closure
+
 | Field | Value |
 |---|---|
-| **relation** | `original` |
-| **decision** | The evaluation source is the original private Stage 1 ChatGPT transcript. No redacted derivative is required based on the sensitive-data assessment. |
+| **relation** | *To be determined* — depends on final sensitive-data outcome |
+| **decision** | The evaluation source will be the original private Stage 1 ChatGPT transcript **if** the final sensitive-data assessment is `cleared`. If the assessment outcome is `redacted_derivative`, the evaluation source must be a recorded redacted derivative with its own path and SHA-256, while the original is preserved. The `original` / `redacted_derivative` relation cannot be determined until the Owner/source provider directly inspects the actual source artifact. |
 
-The `original` relation is bound to the assessment outcome `cleared` per the governance invariant: `cleared → original`. If the source provider's direct inspection later contradicts this assessment, the source must be reclassified as `redacted_derivative` with a new admission record.
+**G1-B requirement:** After direct source inspection, record the final relation — either `original` (if cleared) or `redacted_derivative` (if restricted content exists and a derivative is created).
 
 ---
 
 ## 6. Deterministic Digest / Immutable Source Identity
 
+**Status:** SHA-256 algorithm selected; exact digest requires G1-B gate closure
+
 | Field | Value |
 |---|---|
 | **Digest algorithm** | SHA-256 |
-| **Current digest** | *To be computed when the source transcript is provided for the evaluation run* |
-| **Binding mechanism** | The SHA-256 digest of the source transcript will be recorded at run time in the run manifest (`manifest.json → source.original.sha256`). This admission record identifies the source by *provenance and scope*. The run manifest binds the *exact bytes* used for the run. The combination of admission ID (G1) plus run-time SHA-256 provides deterministic identity binding across planning → admission → execution. |
+| **Current digest** | *Not yet computed* — requires Owner/source provider to provide the exact source artifact for hashing |
+| **Binding requirement** | The SHA-256 digest of the exact admitted source artifact **must be recorded in this admission record before any extraction run executes**. The digest is not deferred to run time. The run manifest will redundantly record the digest of the source copy placed in `data/runs/<run_id>/input/`, but that is a consistency check, not the primary binding. |
+| **Primary binding** | This admission record, patched with the SHA-256 of the exact source artifact, becomes the immutable identity anchor. A run manifest referencing a different byte-level source would not satisfy this admission. |
 
-The admission record establishes the *what* (source identity, provenance, scope). The run manifest establishes the *exact bytes that were used*. Both are required for a fully determined extraction evaluation.
+**G1-B requirement:** Owner/source provider provides the actual source artifact for hashing. SHA-256 is computed and recorded here. The admission record is updated to reflect the exact digest, finalizing the identity binding before any run.
 
 ---
 
@@ -102,14 +126,17 @@ This status is consistent with ADR-003, `docs/governance.md` (§ Evidence classe
 
 ## 9. Governance Compliance
 
-This admission record satisfies the prerequisites stated in `docs/current-status.md` ("Source fixture blocker") and `docs/architecture.md` (§ Input assembler):
+This admission record satisfies the **G1-A source-selection/evidence requirements** stated in `docs/current-status.md` ("Source fixture blocker") and `docs/architecture.md` (§ Input assembler). The **G1-B exact-source admission gate** remains open.
 
-| Requirement | Status |
-|---|---|
-| Supply one complete Stage source | ✅ G1 — engineering-stage-01 |
-| Record sensitive-data selection check | ✅ Outcome: cleared |
-| Preserve original or recorded redacted derivative | ✅ Original preserved outside repository |
-| Historical output remains comparison evidence only | ✅ Section 8 above |
+| Requirement | G1-A status | G1-B outstanding |
+|---|---|---|
+| Source identity, provenance, and bounded scope recorded | ✅ Sections 1–3 | — |
+| Sensitive-data selection check | ✅ Provisional assessment recorded (Section 4) | ⏳ Direct source inspection by Owner, final outcome (`cleared` or `redacted_derivative`) |
+| Original preserved or redacted derivative recorded | ✅ Handling rules defined (Section 7); original preserved outside repo | ⏳ Relation (`original` / `redacted_derivative`) determined after final sensitive-data outcome |
+| Deterministic digest / immutable identity | ✅ Algorithm specified (SHA-256) | ⏳ Exact digest computed and recorded in this admission record before execution |
+| Historical output remains comparison evidence | ✅ Section 8 | — |
+
+**The source fixture blocker in `docs/current-status.md` is not fully resolved until all G1-B items above are closed.**
 
 ---
 

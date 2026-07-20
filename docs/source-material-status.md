@@ -8,7 +8,7 @@
 | Extraction Contract v0.1 | `specs/drafts/extraction-contract-v0.1.md` | Draft, not frozen | Candidate domain-agnostic extraction contract |
 | Conversation Profile v0.1 | `profiles/drafts/conversation-profile-v0.1.md` | Draft, not frozen | Candidate profile extending the draft contract |
 | Stage 1–7 outputs | `tests/fixtures/stage-outputs/` | Observational test evidence | Review variance, defects, and regression behavior |
-| Stage 1 ChatGPT transcript (G1 admitted source) | Outside repository — see `docs/admissions/g1-source-fixture-admission.md` | Admitted for evaluation-bound run | First vertical-slice extraction source (engineering-stage-01) |
+| Stage 1 ChatGPT transcript (G1 admitted source — provisional) | Outside repository — see `docs/admissions/g1-source-fixture-admission.md` | Admitted pending exact-source gate (G1-B) | Source selection candidate for first vertical-slice evaluation (engineering-stage-01) |
 
 ## Duplicate baseline decision
 

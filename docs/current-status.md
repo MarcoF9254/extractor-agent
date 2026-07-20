@@ -41,18 +41,25 @@ ChatGPT data-export ZIP archives. Its scope is:
 prohibition on implementation (see Hard holds below). No further
 implementation beyond Pilot A is authorized.
 
-## Source fixture blocker — G1 resolved
+## Source fixture blocker — G1-A source selection recorded, G1-B exact-source admission gate open
 
-The repository contained historical extraction outputs, not their complete bounded Stage transcripts.
+The repository contains historical extraction outputs, not their complete bounded Stage transcripts.
 
-**G1 Source Fixture Admission (2026-07-20):** Stage 1 (`engineering-stage-01`) has been admitted via `docs/admissions/g1-source-fixture-admission.md`. The requirements are satisfied:
+**G1-A complete (2026-07-20):** Source selection record for `engineering-stage-01` (Stage 1) is established in `docs/admissions/g1-source-fixture-admission.md`:
 
-1. ✅ One complete Stage source: `engineering-stage-01` (Stage 1 ChatGPT transcript)
-2. ✅ Sensitive-data selection check recorded: cleared (see admission record)
-3. ✅ Original preserved outside repository (no redacted derivative required)
-4. ✅ Historical outputs remain comparison evidence only
+* ✅ Source identity, provenance, and bounded scope documented
+* ✅ Provisional sensitive-data assessment recorded (pending direct source inspection)
+* ✅ Private handling rules defined (source stays outside repository)
+* ✅ Historical outputs confirmed as comparison evidence only
 
-No additional Stage sources are admitted. Each future Stage source requires its own admission record before use in an extraction evaluation run.
+**G1-B still required** before any extraction run:
+
+* ⏳ Direct inspection of the actual source artifact by the Owner/source provider
+* ⏳ Final sensitive-data determination (`cleared` or `redacted_derivative`)
+* ⏳ Relation determination (`original` vs `redacted_derivative`)
+* ⏳ SHA-256 digest of the exact admitted artifact recorded in the admission record
+
+The source fixture blocker persists until G1-B is closed.
 
 ## Validation required before approval (post-Pilot-A)
 
