@@ -15,6 +15,12 @@ This Profile supplies only the domain authority reserved for Profiles:
 
 The Contract's grounding requirement, item skeleton, quality filter, in-source deduplication, output rules, and downstream exclusions remain unchanged.
 
+### Contract escape hatch / self-check
+
+If any Profile-local instruction, exclusion, or Knowledge-Type assignment would produce an item that violates the Contract's grounding requirement (`normalized_statement` must be directly supported by source evidence), quality filter (any required answer to the Contract's four questions is No), or downstream exclusions, the **Contract prevails**. The Profile is an extension, not an override.
+
+Before outputting each candidate, verify that no Profile-local decision (type assignment, exclusion application, scope narrowing) has silently evaded a Contract constraint that would have blocked the item if the Contract alone were evaluated. This is a self-check; it does not modify the Contract or create new Contract obligations.
+
 ## Extraction Target
 
 Distill durable engineering knowledge that emerged from one bounded engineering conversation or project stage and could guide decisions in a genuinely different software project, programming language, repository, team, or technology stack.
@@ -60,6 +66,7 @@ After applying the Contract's four required questions, also ask:
 2. Could another engineering team apply it without knowing the source project's domain?
 3. Has project history been removed without removing the evidence pointer?
 4. If typed as a Rejected Alternative, are the rejection reason and possible validity conditions both present?
+5. **Knowledge Type cannot rescue a failed item.** Does this item pass all four Contract quality questions **independent of** which Knowledge Type is assigned? If a question fails for the item as a candidate, assigning a different or permissive type does not fix it. The Knowledge Type is a classification of a passing item, not a quality pass itself.
 
 If any required answer is No, discard the item.
 
@@ -71,8 +78,19 @@ The first run must record evidence about:
 - whether Testing Strategy and Development Workflow overlap excessively;
 - whether Repository & Git Practice deserves a separate type;
 - whether Pitfall and Rejected Alternative are consistently separated;
-- whether the Contract's common item skeleton can represent the historical baseline's “When NOT to use” content through Trade-offs / Limitations;
+- whether the Contract's common item skeleton can represent the historical baseline's "When NOT to use" content through Trade-offs / Limitations;
 - whether the profile produces useful items without recreating historical section headings as padding.
+
+### Observation / Open Question enum-pressure notes
+
+The historical Stage 1 output contains items that are descriptive observations or open questions rather than prescriptive engineering knowledge. The 9-type closed enum was designed before bounded-source run evidence against a real Stage transcript. This evaluation note records the following open questions for the first-run evidence:
+
+- Does the 9-type enum force an item into a type it does not fit, producing a plausible-sounding but inaccurate knowledge item?
+- If so, is the right response to discard the item (the item fails the quality gate), or does the enum need revision?
+- Would adding an Observation or Open Question type improve coverage of genuine source content that is neither prescriptive nor a pitfall nor a rejected alternative — or would it create a dumping ground for items that failed the quality filter?
+- Can the existing Rejected Alternative type accommodate open questions that were seriously considered and remain unresolved, or does that stretch the type's semantics?
+
+These questions are recorded for evaluation evidence only. They do not change the 9-type enum. The enum may be revised only from bounded-source run evidence per the rule below.
 
 Do not revise the enum merely because a historical output used a different heading. Revise only from bounded-source run evidence.
 
