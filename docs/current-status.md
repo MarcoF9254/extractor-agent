@@ -1,6 +1,6 @@
 # Current Project Status
 
-**Last updated:** 2026-07-19  
+**Last updated:** 2026-07-20  
 **Default branch:** `main`  
 **Active proposal branch:** *none* — Pilot A merged and provisional
 
@@ -41,19 +41,25 @@ ChatGPT data-export ZIP archives. Its scope is:
 prohibition on implementation (see Hard holds below). No further
 implementation beyond Pilot A is authorized.
 
-## Source fixture blocker
+## Source fixture blocker — G1-A source selection recorded, G1-B exact-source admission gate open
 
-The repository contains historical extraction outputs, not their complete
-bounded Stage transcripts.
+The repository contains historical extraction outputs, not their complete bounded Stage transcripts.
 
-Before the first LLM-extraction run:
+**G1-A complete (2026-07-20):** Source selection record for `engineering-stage-01` (Stage 1) is established in `docs/admissions/g1-source-fixture-admission.md`:
 
-1. supply one complete Stage source;
-2. perform and record the sensitive-data selection check;
-3. preserve the original or create a recorded redacted derivative;
-4. treat the historical output only as comparison evidence.
+* ✅ Source identity, provenance, and bounded scope documented
+* ✅ Provisional sensitive-data assessment recorded (pending direct source inspection)
+* ✅ Private handling rules defined (source stays outside repository)
+* ✅ Historical outputs confirmed as comparison evidence only
 
-No specific Stage source has been selected or admitted.
+**G1-B still required** before any extraction run:
+
+* ⏳ Direct inspection of the actual source artifact by the Owner/source provider
+* ⏳ Final sensitive-data determination (`cleared` or `redacted_derivative`)
+* ⏳ Relation determination (`original` vs `redacted_derivative`)
+* ⏳ SHA-256 digest of the exact admitted artifact recorded in the admission record
+
+The source fixture blocker persists until G1-B is closed.
 
 ## Validation required before approval (post-Pilot-A)
 
