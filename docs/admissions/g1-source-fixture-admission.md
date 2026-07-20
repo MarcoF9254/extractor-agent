@@ -94,7 +94,7 @@ This admission record distinguishes two phases:
 | **Binding requirement** | The SHA-256 digest of the exact admitted source artifact **must be recorded in this admission record before any extraction run executes**. The digest is not deferred to run time. The run manifest will redundantly record the digest of the source copy placed in `data/runs/<run_id>/input/`, but that is a consistency check, not the primary binding. |
 | **Primary binding** | This admission record, patched with the SHA-256 of the exact source artifact, becomes the immutable identity anchor. A run manifest referencing a different byte-level source would not satisfy this admission. |
 
-**G1-B completed for SHA-256:** Digest computed and recorded in this admission record (`7184dcc452e948bac8e11ea2e494c18b84d201c678391530753469e13e311c72`). The source artifact is held in the private external source store. Remaining G1-B items — direct source inspection, final sensitive-data determination, and relation (`original` / `redacted_derivative`) — are still required before any extraction run.
+**G1-B complete — all four requirements satisfied:** SHA-256 digest computed and recorded (`7184dcc452e948bac8e11ea2e494c18b84d201c678391530753469e13e311c72`). Direct source inspection by Owner/source-provider confirmed. Final sensitive-data determination: `cleared_for_private_evaluation`. Relation: `original`. The source artifact is held in the private external source store. Execution is a separate gate — not authorized by this admission (see §10).
 
 ---
 
