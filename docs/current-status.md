@@ -41,19 +41,18 @@ ChatGPT data-export ZIP archives. Its scope is:
 prohibition on implementation (see Hard holds below). No further
 implementation beyond Pilot A is authorized.
 
-## Source fixture blocker
+## Source fixture blocker — G1 resolved
 
-The repository contains historical extraction outputs, not their complete
-bounded Stage transcripts.
+The repository contained historical extraction outputs, not their complete bounded Stage transcripts.
 
-Before the first LLM-extraction run:
+**G1 Source Fixture Admission (2026-07-20):** Stage 1 (`engineering-stage-01`) has been admitted via `docs/admissions/g1-source-fixture-admission.md`. The requirements are satisfied:
 
-1. supply one complete Stage source;
-2. perform and record the sensitive-data selection check;
-3. preserve the original or create a recorded redacted derivative;
-4. treat the historical output only as comparison evidence.
+1. ✅ One complete Stage source: `engineering-stage-01` (Stage 1 ChatGPT transcript)
+2. ✅ Sensitive-data selection check recorded: cleared (see admission record)
+3. ✅ Original preserved outside repository (no redacted derivative required)
+4. ✅ Historical outputs remain comparison evidence only
 
-No specific Stage source has been selected or admitted.
+No additional Stage sources are admitted. Each future Stage source requires its own admission record before use in an extraction evaluation run.
 
 ## Validation required before approval (post-Pilot-A)
 
